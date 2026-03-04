@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-client-id" content="265869413628-8a9rlgem2m7p8qlith3d9bel2vkru8vu.apps.googleusercontent.com">
+    <title>Login - Welcome Back</title>
+
+    <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/assets/css/fontawesome-fonts.css">
+    <link rel="stylesheet" href="/assets/css/animate.css">
+    <link rel="stylesheet" href="/assets/css/odometer.css">
+    <link rel="stylesheet" href="/assets/css/slick.min.css">
+        <link rel="stylesheet" href="/assets/css/style.css">
+    
+    <!-- Custom Auth Styles -->
+    <link rel="stylesheet" href="/auth.css">
+
+    <!-- Google Sign-In SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+
+
+
+
+    
+    <!-- Pre-loader Start -->
+
+
+    <div class="cs_preloader cs_white_bg">
+        <div class="cs_preloader_in position-relative">
+            <span></span>
+        </div>
+    </div>
+
+
+    <!-- Header component starts here -->
+
+
+        <header class="cs_site_header cs_style_1 cs_sticky_header cs_heading_font position-relative">
+      <div class="cs_main_header">
+        <div class="container">
+          <div class="cs_main_header_in position-relative">
+            <div class="cs_header_shape position-absolute">
+              <img src="/assets/img/header-shape.svg" alt="Header shape">
+            </div>
+            <div class="cs_main_header_left position-relative z-1">
+              <a class="cs_site_branding" href="index.html" aria-label="Home page link">
+                <img src="/assets/img/logo.png" alt="Logo">
+              </a>
+            </div>
+            <div class="cs_main_header_center">
+              <div class="cs_nav">
+                <ul class="cs_nav_list">
+                  <li><a href="index.html" aria-label="Menu link">Home</a></li>
+                  <li><a href="about-us.html" aria-label="Menu link">About Us</a></li>
+                  <li><a href="automation.html" aria-label="Menu link">Automation</a></li>
+                  <li><a href="faqs.html" aria-label="Menu link">FAQ & Answers</a></li>
+                  <li><a href="contact.html" aria-label="Menu link">Contact Us</a></li>
+                </ul>
+              </div>
+            </div>
+            <div class="cs_main_header_right">
+              <a href="signup.html" aria-label="Get started button" class="cs_btn cs_style_1 cs_bg_1 cs_fs_14 cs_bold cs_white_color text-uppercase">
+                <span>Get Started</span>
+                <span class="cs_btn_icon"><i class="fa-solid fa-arrow-right"></i></span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+
+
+
+
+
+
+
+
+
+
+
+    <!-- Main Authentication Container -->
+    <div class="auth-wrapper">
+        <div class="auth-background"></div>
+
+        <!-- Authentication Card -->
+        <div class="auth-card animate__animated animate__fadeIn">
+            <!-- Tab Navigation -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Login</button>
+                <button class="auth-tab" data-tab="signup" onclick="window.location.href='signup.html'">Sign Up</button>
+            </div>
+
+            <!-- Login Form Content -->
+            <div class="auth-content">
+                <h1 class="auth-title">Welcome Back!</h1>
+                <p class="auth-subtitle">Login to access your account</p>
+
+                <!-- Google Login Button Container -->
+                <div id="g_id_onload"
+                     data-client_id="265869413628-8a9rlgem2m7p8qlith3d9bel2vkru8vu.apps.googleusercontent.com"
+                     data-context="signin"
+                     data-ux_mode="popup"
+                     data-callback="handleGoogleSignIn"
+                     data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-shape="rectangular"
+                     data-theme="outline"
+                     data-text="signin_with"
+                     data-size="large"
+                     data-logo_alignment="left"
+                     data-width="400">
+                </div>
+
+                <!-- Divider -->
+                <div class="divider">
+                    <span>Or continue with email</span>
+                </div>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form" novalidate>
+                    <!-- Email Input -->
+                    <div class="form-group">
+                        <label for="loginEmail">Email Address</label>
+                        <input
+                            type="email"
+                            id="loginEmail"
+                            name="email"
+                            class="form-control"
+                            placeholder="you@example.com"
+                            required
+                        >
+                        <div class="error-message" id="emailError"></div>
+                    </div>
+
+                    <!-- Password Input -->
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <div class="password-wrapper">
+                            <input
+                                type="password"
+                                id="loginPassword"
+                                name="password"
+                                class="form-control"
+                                placeholder="Enter your password"
+                                maxlength="128"
+                                required
+                            >
+                            <button type="button" class="toggle-password" data-target="loginPassword">
+                                <i class="far fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="error-message" id="passwordError"></div>
+                    </div>
+
+                    <!-- Remember Me & Forgot Password -->
+                    <div class="form-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="rememberMe" name="remember">
+                            <span>Remember me</span>
+                        </label>
+                        <a href="#" class="forgot-link">Forgot Password?</a>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="submit-btn">
+                        <span class="btn-text">Login</span>
+                        <span class="btn-loader" style="display: none;">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </span>
+                    </button>
+
+                    <!-- General Error Message -->
+                    <div class="general-error" id="generalError" style="display: none;"></div>
+                </form>
+
+                <!-- Sign Up Link -->
+                <div class="auth-footer">
+                    <p>Don't have an account? <a href="signup.html" class="auth-link">Sign Up</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Footer -->
+        <div class="security-footer animate__animated animate__fadeInUp">
+            <div class="security-badge">
+                <i class="fas fa-lock"></i>
+                <span>Secure Login</span>
+            </div>
+            <div class="security-badge">
+                <i class="fas fa-shield-alt"></i>
+                <span>Privacy Protected</span>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- 
+    Footer section -->
+
+
+        
+    <footer class="cs_footer cs_style_1 cs_type_2 cs_accent_bg cs_bg_filed" data-src="/assets/img/footer-bg-3.svg">
+      <div class="cs_height_130 cs_height_lg_80"></div>
+      <div class="container">
+        <div class="cs_footer_top position-relative">
+          <ul class="cs_location_list cs_mp_0">
+            <li>
+              <span class="cs_location_icon cs_center cs_heading_color cs_radius_100">
+              <i class="fa-solid fa-location-dot"></i></span>
+              <div class="cs_location_info cs_fs_18">
+                <p class="cs_fs_14 cs_theme_color_4 mb-0">ADDRESS</p>
+                <p class="cs_white_color mb-0">12 Division Park, SKY <br> 12546. Berlin</p>
+              </div>
+            </li>
+            <li>
+              <span class="cs_location_icon cs_center cs_heading_color cs_radius_100">
+              <i class="fa-solid fa-envelope"></i></span>
+              <div class="cs_location_info cs_fs_18">
+                <p class="cs_fs_14 cs_theme_color_4 mb-0">EMAIL</p>
+                <a href="mailto:help@webteck-mail.com" aria-label="Send mail link">help@webteck-mail.com</a> <br>
+                <a href="mailto:24/7@webteck-online.com" aria-label="Send mail link">24/7@webteck-online.com</a>
+              </div>
+            </li>
+            <li>
+              <span class="cs_location_icon cs_center cs_heading_color cs_radius_100">
+              <i class="fa-solid fa-phone"></i></span>
+              <div class="cs_location_info cs_fs_18">
+                <p class="cs_fs_14 cs_theme_color_4 mb-0">CALL</p>
+                <a href="tel:+215253632156" aria-label="Make a call link">+(215) 2536-32156</a><br>
+                <a href="tel:+452369421587" aria-label="Make a call link">+(452) 3694-21587</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="cs_footer_main cs_radius_30">
+          <div class="cs_footer_desc">
+            <div class="cs_brand">
+              <img src="/assets/img/logo-2.png" alt="Logo">
+            </div>
+            <div class="cs_footer_desc_text">GenAI-Powered Intelligent Assistant helps you automate repetitive online tasks, save time, and increase productivity with smart AI commands.</div>
+          </div>
+          <div class="cs_footer_header cs_radius_30">
+            <ul class="cs_footer_menu cs_semibold cs_white_color cs_mp_0">
+              <li><a href="index.html" aria-label="Home page link">Home</a></li>
+              <li><a href="about-us.html" aria-label="About page link">About Us</a></li>
+              <li><a href="automation.html" aria-label="Automation page link">Automation</a></li>
+              <li><a href="integrations.html" aria-label="Integrations page link">Integrations</a></li>
+              <li><a href="faqs.html" aria-label="FAQ page link">FAQs</a></li>
+              <li><a href="contact.html" aria-label="Contact page link">Contact Us</a></li>
+            </ul>
+            <div class="cs_social_links cs_style_1 cs_heading_color">
+              <a href="#" aria-label="Social link"><i class="fa-brands fa-facebook-f"></i></a>
+              <a href="#" aria-label="Social link"><i class="fa-brands fa-x-twitter"></i></a>
+              <a href="#" aria-label="Social link"><i class="fa-brands fa-instagram"></i></a>             
+              <a href="#" aria-label="Social link"><i class="fa-brands fa-behance"></i></a>
+            </div>
+          </div>
+        </div>
+        <div class="cs_footer_bottom position-relative">
+          <div class="cs_footer_text cs_white_color text-center">Copyright &copy; <span class="cs_getting_year"></span> Saaso theme by Themeservices</div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="/assets/js/jquery.min.js"></script>
+    <script src="/assets/js/wow.min.js"></script>
+    <script src="/assets/js/jquery.slick.min.js"></script>
+    <script src="/assets/js/isotope.pkgd.min.js"></script>
+    <script src="/assets/js/odometer.js"></script>
+    <script src="/assets/js/main.js"></script>
+
+    <!-- Custom Auth JavaScript -->
+    <script src="/auth.js"></script>
+
+    <!-- Google Sign-In Callback -->
+    <script>
+        async function handleGoogleSignIn(response) {
+            console.log('Google Sign-In callback triggered');
+            try {
+                const result = await fetch('/api/auth/google', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        credential: response.credential
+                    })
+                });
+
+                const data = await result.json();
+                console.log('Backend response:', data);
+
+                if (data.success) {
+                    // Redirect to dashboard
+                    window.location.href = data.redirect || '/dashboard';
+                } else {
+                    // Check if user needs to signup first
+                    if (data.redirect && data.redirect === '/signup') {
+                        // Create modern popup modal
+                        const modalHTML = `
+                            <div id="accountNotFoundModal" style="
+                                position: fixed;
+                                top: 0;
+                                left: 0;
+                                width: 100%;
+                                height: 100%;
+                                background-color: rgba(0, 0, 0, 0.6);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                z-index: 9999;
+                                animation: fadeIn 0.3s ease;
+                            ">
+                                <div style="
+                                    background: white;
+                                    border-radius: 16px;
+                                    padding: 40px;
+                                    max-width: 400px;
+                                    text-align: center;
+                                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                                    animation: slideUp 0.3s ease;
+                                ">
+                                    <div style="
+                                        width: 80px;
+                                        height: 80px;
+                                        background: linear-gradient(135deg, #FFA726 0%, #FF9800 100%);
+                                        border-radius: 50%;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        margin: 0 auto 24px;
+                                    ">
+                                        <i class="fas fa-user-plus" style="font-size: 36px; color: white;"></i>
+                                    </div>
+                                    <h3 style="color: #2c3e50; margin-bottom: 12px; font-size: 24px; font-weight: 600;">
+                                        Account Not Found
+                                    </h3>
+                                    <p style="color: #7f8c8d; font-size: 16px; margin-bottom: 24px; line-height: 1.5;">
+                                        Please create an account first to continue
+                                    </p>
+                                    <div style="
+                                        background: #f8f9fa;
+                                        border-radius: 8px;
+                                        padding: 16px;
+                                        margin-bottom: 24px;
+                                    ">
+                                        <p style="color: #495057; font-size: 14px; margin: 0;">
+                                            Redirecting to signup in <span id="countdown" style="font-weight: bold; color: #FF9800;">3</span>s
+                                        </p>
+                                    </div>
+                                    <button onclick="window.location.href='/signup'" style="
+                                        background: #000000;
+                                        color: white;
+                                        border: none;
+                                        padding: 12px 32px;
+                                        border-radius: 8px;
+                                        font-size: 16px;
+                                        font-weight: 600;
+                                        cursor: pointer;
+                                        transition: all 0.2s ease;
+                                    " onmouseover="this.style.transform='translateY(-2px)'; this.style.background='#333333';" onmouseout="this.style.transform='translateY(0)'; this.style.background='#000000';">
+                                        Go to Signup Now
+                                    </button>
+                                </div>
+                            </div>
+                            <style>
+                                @keyframes fadeIn {
+                                    from { opacity: 0; }
+                                    to { opacity: 1; }
+                                }
+                                @keyframes slideUp {
+                                    from { transform: translateY(30px); opacity: 0; }
+                                    to { transform: translateY(0); opacity: 1; }
+                                }
+                            </style>
+                        `;
+
+                        // Add modal to page
+                        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+                        // Countdown timer
+                        let countdown = 3;
+                        const countdownElement = document.getElementById('countdown');
+                        const countdownInterval = setInterval(() => {
+                            countdown--;
+                            if (countdownElement) {
+                                countdownElement.textContent = countdown;
+                            }
+                            if (countdown <= 0) {
+                                clearInterval(countdownInterval);
+                            }
+                        }, 1000);
+
+                        // Redirect after 3 seconds
+                        setTimeout(() => {
+                            window.location.href = '/signup';
+                        }, 3000);
+                    } else {
+                        // Show error message
+                        const errorDiv = document.getElementById('generalError');
+                        if (errorDiv) {
+                            errorDiv.textContent = data.error || 'Google authentication failed';
+                            errorDiv.style.display = 'block';
+                        } else {
+                            alert(data.error || 'Google authentication failed');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Google auth error:', error);
+                const errorDiv = document.getElementById('generalError');
+                if (errorDiv) {
+                    errorDiv.textContent = 'Failed to authenticate with Google. Please try again.';
+                    errorDiv.style.display = 'block';
+                } else {
+                    alert('Failed to authenticate with Google. Please try again.');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

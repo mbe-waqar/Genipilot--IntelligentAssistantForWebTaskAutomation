@@ -1,0 +1,539 @@
+"""
+FastAPI Backend with Session-Based Authentication
+Supports both website (HTML) and browser extension (JSON API)
+"""
+
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field, validator
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
+import secrets
+from typing import Optional
+
+# Initialize FastAPI app
+app = FastAPI(title="MyApp - Authentication System")
+
+# Add session middleware with a secure secret key
+# In production, use environment variable: os.getenv("SECRET_KEY")
+SECRET_KEY = secrets.token_urlsafe(32)
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+# Setup Jinja2 templates
+templates = Jinja2Templates(directory="templates")
+
+# MongoDB connection settings
+MONGO_URL = "mongodb://localhost:27017/"
+DATABASE_NAME = "myapp"
+USERS_COLLECTION = "users"
+
+# MongoDB client (will be initialized on startup)
+mongo_client: Optional[AsyncIOMotorClient] = None
+db = None
+
+# Password hasher using argon2
+ph = PasswordHasher()
+
+
+# ============================================================================
+# Pydantic Models for Validation
+# ============================================================================
+
+class UserSignup(BaseModel):
+    """User signup schema with validation"""
+    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @validator('username')
+    def username_alphanumeric(cls, v):
+        """Ensure username contains only alphanumeric characters and underscores"""
+        if not v.replace('_', '').isalnum():
+            raise ValueError('Username must contain only letters, numbers, and underscores')
+        return v
+
+    @validator('password')
+    def password_strength(cls, v):
+        """Validate password strength"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one number')
+        return v
+
+
+class UserLogin(BaseModel):
+    """User login schema"""
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+# ============================================================================
+# Database Connection Events
+# ============================================================================
+
+@app.on_event("startup")
+async def startup_db_client():
+    """Initialize MongoDB connection on startup"""
+    global mongo_client, db
+    try:
+        mongo_client = AsyncIOMotorClient(MONGO_URL)
+        db = mongo_client[DATABASE_NAME]
+
+        # Create unique index on email field
+        await db[USERS_COLLECTION].create_index("email", unique=True)
+        print(f"✓ Connected to MongoDB: {DATABASE_NAME}")
+    except Exception as e:
+        print(f"✗ Failed to connect to MongoDB: {e}")
+        print(f"  Make sure MongoDB is running at {MONGO_URL}")
+        # Set db to None so we can check later
+        db = None
+
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    """Close MongoDB connection on shutdown"""
+    if mongo_client:
+        mongo_client.close()
+        print("✓ MongoDB connection closed")
+
+
+# ============================================================================
+# Authentication Helper Functions
+# ============================================================================
+
+def get_current_user(request: Request) -> Optional[dict]:
+    """Get current logged-in user from session"""
+    user_email = request.session.get("user_email")
+    if user_email:
+        return {"email": user_email}
+    return None
+
+
+def require_auth(request: Request) -> dict:
+    """Dependency to require authentication"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
+async def hash_password(password: str) -> str:
+    """Hash password using argon2"""
+    return ph.hash(password)
+
+
+async def verify_password(password: str, hashed_password: str) -> bool:
+    """Verify password against hash"""
+    try:
+        ph.verify(hashed_password, password)
+        return True
+    except VerifyMismatchError:
+        return False
+
+
+# ============================================================================
+# Static File Routes (for auth.css and auth.js in templates root)
+# ============================================================================
+
+@app.get("/auth.css")
+async def serve_auth_css():
+    """Serve auth.css from templates directory"""
+    return FileResponse("templates/auth.css", media_type="text/css")
+
+
+@app.get("/auth.js")
+async def serve_auth_js():
+    """Serve auth.js from templates directory"""
+    return FileResponse("templates/auth.js", media_type="application/javascript")
+
+
+# ============================================================================
+# Website Routes (HTML Responses)
+# ============================================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    """Render home/index page"""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/index.html", response_class=HTMLResponse)
+async def index_html(request: Request):
+    """Render index page (alternate route)"""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/about-us", response_class=HTMLResponse)
+@app.get("/about-us.html", response_class=HTMLResponse)
+async def about_us(request: Request):
+    """Render about us page"""
+    return templates.TemplateResponse("about-us.html", {"request": request})
+
+
+@app.get("/services", response_class=HTMLResponse)
+@app.get("/services.html", response_class=HTMLResponse)
+async def services(request: Request):
+    """Render services page"""
+    return templates.TemplateResponse("services.html", {"request": request})
+
+
+@app.get("/integrations", response_class=HTMLResponse)
+@app.get("/integrations.html", response_class=HTMLResponse)
+async def integrations(request: Request):
+    """Render integrations page"""
+    return templates.TemplateResponse("integrations.html", {"request": request})
+
+
+@app.get("/faqs", response_class=HTMLResponse)
+@app.get("/faqs.html", response_class=HTMLResponse)
+async def faqs(request: Request):
+    """Render FAQs page"""
+    return templates.TemplateResponse("faqs.html", {"request": request})
+
+
+@app.get("/contact", response_class=HTMLResponse)
+@app.get("/contact.html", response_class=HTMLResponse)
+async def contact(request: Request):
+    """Render contact page"""
+    return templates.TemplateResponse("contact.html", {"request": request})
+
+
+@app.get("/signup", response_class=HTMLResponse)
+@app.get("/signup.html", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    """Render signup page"""
+    # If user is already logged in, redirect to dashboard
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+
+@app.post("/signup")
+async def signup_user(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...)
+):
+    """Handle user signup from website form"""
+    try:
+        # Validate input using Pydantic model
+        user_data = UserSignup(username=name, email=email, password=password)
+
+        # Check if user already exists
+        existing_user = await db[USERS_COLLECTION].find_one({"email": user_data.email})
+        if existing_user:
+            return templates.TemplateResponse(
+                "signup.html",
+                {"request": request, "error": "Email already registered"}
+            )
+
+        # Hash the password
+        hashed_pw = await hash_password(user_data.password)
+
+        # Create user document
+        user_doc = {
+            "username": user_data.username,
+            "email": user_data.email,
+            "password": hashed_pw
+        }
+
+        # Insert user into database
+        result = await db[USERS_COLLECTION].insert_one(user_doc)
+
+        if result.inserted_id:
+            # Set session
+            request.session["user_email"] = user_data.email
+            request.session["username"] = user_data.username
+
+            # Redirect to dashboard
+            return RedirectResponse(url="/dashboard", status_code=302)
+        else:
+            return templates.TemplateResponse(
+                "signup.html",
+                {"request": request, "error": "Failed to create user"}
+            )
+
+    except ValueError as e:
+        # Validation error
+        return templates.TemplateResponse(
+            "signup.html",
+            {"request": request, "error": str(e)}
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "signup.html",
+            {"request": request, "error": f"An error occurred: {str(e)}"}
+        )
+
+
+@app.get("/login", response_class=HTMLResponse)
+@app.get("/login.html", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Render login page"""
+    # If user is already logged in, redirect to dashboard
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.post("/login")
+async def login_user(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...)
+):
+    """Handle user login from website form"""
+    try:
+        # Validate input
+        login_data = UserLogin(email=email, password=password)
+
+        # Find user in database
+        user = await db[USERS_COLLECTION].find_one({"email": login_data.email})
+
+        if not user:
+            return templates.TemplateResponse(
+                "login.html",
+                {"request": request, "error": "Invalid email or password"}
+            )
+
+        # Verify password
+        is_valid = await verify_password(login_data.password, user["password"])
+
+        if not is_valid:
+            return templates.TemplateResponse(
+                "login.html",
+                {"request": request, "error": "Invalid email or password"}
+            )
+
+        # Set session
+        request.session["user_email"] = user["email"]
+        request.session["username"] = user.get("username", "User")
+
+        # Redirect to dashboard
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": f"An error occurred: {str(e)}"}
+        )
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    """Render dashboard page (requires authentication)"""
+    user = get_current_user(request)
+
+    # If not logged in, redirect to signup
+    if not user:
+        return RedirectResponse(url="/signup", status_code=302)
+
+    # Get username from session
+    username = request.session.get("username", "User")
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request, "username": username, "email": user["email"]}
+    )
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    """Logout user and clear session"""
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=302)
+
+
+# ============================================================================
+# Browser Extension API Routes (JSON Responses)
+# ============================================================================
+
+@app.post("/ext/login")
+async def ext_login(request: Request, credentials: UserLogin):
+    """
+    Extension login endpoint - accepts JSON
+    Returns: {"success": true} on valid login
+    """
+    try:
+        # Find user in database
+        user = await db[USERS_COLLECTION].find_one({"email": credentials.email})
+
+        if not user:
+            return JSONResponse(
+                status_code=401,
+                content={"success": False, "error": "Invalid email or password"}
+            )
+
+        # Verify password
+        is_valid = await verify_password(credentials.password, user["password"])
+
+        if not is_valid:
+            return JSONResponse(
+                status_code=401,
+                content={"success": False, "error": "Invalid email or password"}
+            )
+
+        # Set session for extension
+        request.session["user_email"] = user["email"]
+        request.session["username"] = user.get("username", "User")
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": "Login successful",
+                "user": {
+                    "email": user["email"],
+                    "username": user.get("username", "User")
+                }
+            }
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Server error: {str(e)}"}
+        )
+
+
+@app.get("/ext/chat")
+async def ext_chat(request: Request):
+    """
+    Extension chat endpoint - requires valid session
+    Returns: Chat data if authenticated, error if not
+    """
+    user = get_current_user(request)
+
+    if not user:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Not logged in"}
+        )
+
+    # Return chat data (example response)
+    return JSONResponse(
+        content={
+            "success": True,
+            "message": "Chat endpoint accessed successfully",
+            "user": user,
+            "data": {
+                "chats": [
+                    {"id": 1, "message": "Welcome to the chat!", "timestamp": "2025-11-16 10:00"},
+                    {"id": 2, "message": "How can I help you today?", "timestamp": "2025-11-16 10:01"}
+                ]
+            }
+        }
+    )
+
+
+@app.post("/ext/signup")
+async def ext_signup(request: Request, user_data: UserSignup):
+    """
+    Extension signup endpoint - accepts JSON
+    Returns: {"success": true} on successful signup
+    """
+    try:
+        # Check if user already exists
+        existing_user = await db[USERS_COLLECTION].find_one({"email": user_data.email})
+        if existing_user:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Email already registered"}
+            )
+
+        # Hash the password
+        hashed_pw = await hash_password(user_data.password)
+
+        # Create user document
+        user_doc = {
+            "username": user_data.username,
+            "email": user_data.email,
+            "password": hashed_pw
+        }
+
+        # Insert user into database
+        result = await db[USERS_COLLECTION].insert_one(user_doc)
+
+        if result.inserted_id:
+            # Set session
+            request.session["user_email"] = user_data.email
+            request.session["username"] = user_data.username
+
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": "User created successfully",
+                    "user": {
+                        "email": user_data.email,
+                        "username": user_data.username
+                    }
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": "Failed to create user"}
+            )
+
+    except ValueError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": str(e)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Server error: {str(e)}"}
+        )
+
+
+@app.get("/ext/logout")
+async def ext_logout(request: Request):
+    """Extension logout endpoint"""
+    request.session.clear()
+    return JSONResponse(content={"success": True, "message": "Logged out successfully"})
+
+
+# ============================================================================
+# Health Check Endpoint
+# ============================================================================
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "database": "connected" if db else "disconnected"}
+
+
+# ============================================================================
+# Mount Static Files (MUST be after all routes!)
+# ============================================================================
+
+# Mount static files for CSS, JS, images
+# IMPORTANT: This must be at the end, after all route definitions
+try:
+    app.mount("/assets", StaticFiles(directory="templates/assets"), name="assets")
+    print("✓ Static files mounted at /assets")
+except Exception as e:
+    print(f"✗ Warning: Could not mount assets directory: {e}")
+
+
+# ============================================================================
+# Run the application
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

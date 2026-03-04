@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grant Microphone Access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary: #016B61;
+      --color-primary-light: #70B2B2;
+      --color-accent: #9ECFD4;
+      --color-bg: #F8FAFA;
+      --color-text: #1a1a1a;
+      --font-heading: 'Sora', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .permission-container {
+      background: white;
+      border-radius: 24px;
+      padding: 48px 40px;
+      max-width: 450px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: slideIn 0.4s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .mic-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 8px 24px rgba(1, 107, 97, 0.3);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 12px 32px rgba(1, 107, 97, 0.5);
+      }
+    }
+
+    .mic-icon svg {
+      width: 40px;
+      height: 40px;
+      stroke: white;
+      stroke-width: 2.5;
+    }
+
+    h1 {
+      font-family: var(--font-heading);
+      font-size: 24px;
+      color: var(--color-primary);
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
+
+    p {
+      color: var(--color-text);
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+      opacity: 0.8;
+    }
+
+    .allow-btn {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+      color: white;
+      border: none;
+      padding: 16px 48px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 24px rgba(1, 107, 97, 0.3);
+      font-family: var(--font-body);
+    }
+
+    .allow-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(1, 107, 97, 0.4);
+    }
+
+    .allow-btn:active {
+      transform: translateY(0);
+    }
+
+    .status {
+      margin-top: 24px;
+      font-size: 14px;
+      color: var(--color-primary);
+      font-weight: 500;
+      min-height: 20px;
+    }
+
+    .success {
+      color: #059669;
+    }
+
+    .error {
+      color: #dc2626;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--color-primary);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="permission-container">
+    <div class="mic-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+        <line x1="12" y1="19" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+      </svg>
+    </div>
+
+    <h1>Microphone Access Required</h1>
+    <p>The voice assistant needs permission to access your microphone.</p>
+    <p style="margin-bottom: 8px; font-size: 14px;"><strong>Steps:</strong></p>
+    <p style="margin-bottom: 24px; font-size: 14px; text-align: left; max-width: 380px; margin-left: auto; margin-right: auto;">
+      1. Click the button below<br>
+      2. Browser will ask: "Allow microphone?"<br>
+      3. Click <strong>ALLOW</strong><br>
+      4. This window will close automatically
+    </p>
+
+    <button id="allowBtn" class="allow-btn">
+      Allow Microphone Access
+    </button>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script src="permission.js"></script>
+</body>
+</html>

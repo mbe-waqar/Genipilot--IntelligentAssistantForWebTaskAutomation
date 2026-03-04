@@ -1,0 +1,58 @@
+# FastAPI and ASGI server
+fastapi
+uvicorn
+
+# Database - MongoDB async driver
+motor
+pymongo
+
+# Password hashing
+argon2-cffi
+
+# Templates and forms
+jinja2
+python-multipart
+
+# Email validation
+email-validator
+aiosmtplib
+
+# Session middleware
+itsdangerous
+
+# Environment variables
+python-dotenv>=1.0.1
+
+# Google OAuth
+google-auth
+google-auth-oauthlib>=1.2.2
+google-auth-httplib2
+
+# Browser automation
+browser-use
+playwright
+
+# OpenAI & LangChain
+openai
+langchain
+# Optional LangChain integrations
+langchain[openai]
+langchain[anthropic]
+
+# OpenAI Agent SDK
+openai-agents
+
+# WebSockets
+websockets
+
+# HTTP Client
+aiohttp
+
+# Task Scheduling
+apscheduler
+
+# BSON for MongoDB ObjectId operations
+pymongo[srv]
+
+# Optional: For local content extraction
+readability-lxml

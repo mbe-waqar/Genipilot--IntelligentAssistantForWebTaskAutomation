@@ -1,0 +1,17 @@
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\ChromeAutomationProfile"
+
+
+
+
+
+Open YouTube, ask me what song I want to hear, then play it.
+
+
+
+open the google and ask me the search query use the tool
+
+
+
+Go to youtube, ask me what to search for, then perform the search and play the video according to search.
+
+

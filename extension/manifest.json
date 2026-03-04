@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "AI Chat Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered chat assistant with authentication",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "identity",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://localhost:5005/*",
+    "https://accounts.google.com/*"
+  ],
+  "side_panel": {
+    "default_path": "login.html"
+  },
+  "action": {
+    "default_title": "Open AI Chat Assistant"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' http://localhost:8000 http://localhost:5005 ws://localhost:5005 https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com;"
+  },
+  "oauth2": {
+    "client_id": "265869413628-8a9rlgem2m7p8qlith3d9bel2vkru8vu.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  }
+}

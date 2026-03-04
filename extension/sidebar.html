@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chat Assistant</title>
+
+  <!-- Google Fonts: Sora for headings, DM Sans for body -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <!-- Side Panel Container -->
+  <div class="side-panel">
+
+    <!-- Header -->
+    <header class="panel-header">
+      <h1 class="panel-title">AI Chat Assistant</h1>
+      <div class="header-accent"></div>
+    </header>
+
+    <!-- Chat Messages Area -->
+    <main class="chat-area" id="chatArea" role="log" aria-live="polite" aria-label="Chat messages">
+      <!-- Welcome message -->
+      <div class="welcome-message">
+        <svg class="welcome-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <h2>Welcome!</h2>
+        <p>Start a conversation or use voice input to chat.</p>
+      </div>
+
+      <!-- Messages will be dynamically inserted here -->
+    </main>
+
+    <!-- Composer Bar -->
+    <div class="composer-bar">
+
+      <!-- Inline Voice Transcript Bar (visible only while recording) -->
+      <div id="voiceTranscriptBar" class="voice-transcript-bar" style="display: none;">
+        <div class="voice-transcript-content">
+          <span class="voice-recording-dot"></span>
+          <span id="voiceLiveText" class="voice-live-text"></span>
+        </div>
+        <button id="voiceCancelBtn" class="voice-cancel-btn" title="Cancel recording" aria-label="Cancel voice recording">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Mic Denied Banner (shown only when mic is permanently blocked) -->
+      <div id="micDeniedBanner" class="mic-denied-banner" style="display:none;" role="alert">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        </svg>
+        <span class="mic-denied-text">Microphone permanently blocked. Go to <strong>Chrome → Settings → Privacy and security → Site settings → Microphone</strong> to allow it.</span>
+        <button id="micDeniedDismiss" class="mic-denied-dismiss" aria-label="Dismiss microphone warning" type="button">×</button>
+      </div>
+
+      <div class="composer-container">
+        <!-- Multi-line input -->
+        <textarea
+          id="messageInput"
+          class="message-input"
+          placeholder="Type your message..."
+          rows="1"
+          aria-label="Message input"
+          maxlength="2000"
+        ></textarea>
+
+        <!-- Action Buttons -->
+        <div class="composer-actions">
+          <!-- Stop Button (hidden by default, shown during automation) -->
+          <button
+            id="stopBtn"
+            class="stop-btn"
+            aria-label="Stop automation"
+            title="Stop the running automation"
+            type="button"
+            style="display: none;"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+          </button>
+
+          <!-- Voice Input Button -->
+          <button
+            id="voiceBtn"
+            class="voice-btn"
+            aria-label="Toggle voice input"
+            title="Click to use voice input"
+            type="button"
+          >
+            <svg class="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+            <span class="recording-indicator" aria-hidden="true"></span>
+          </button>
+
+          <!-- Send Button -->
+          <button
+            id="sendBtn"
+            class="send-btn"
+            aria-label="Send message"
+            title="Send message (Enter)"
+            type="button"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Status/Notification Area -->
+      <div id="statusToast" class="status-toast" role="status" aria-live="polite"></div>
+    </div>
+
+  </div>
+
+  <script src="sidebar.js"></script>
+</body>
+</html>

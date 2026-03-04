@@ -1,0 +1,468 @@
+/**
+ * AI Chat Assistant - Sidebar JavaScript
+ * Handles chat functionality, voice input, and user interactions
+ */
+
+// ========================================
+// Constants & State
+// ========================================
+const MAX_MESSAGE_LENGTH = 2000;
+const TOAST_DURATION = 3000; // milliseconds
+const AUTO_STOP_SILENCE_MS = 2000; // Stop recording after 2s of silence
+
+const state = {
+  isRecording: false,
+  recognition: null,
+  silenceTimer: null,
+  interimTranscript: '',
+  finalTranscript: ''
+};
+
+// ========================================
+// DOM Elements
+// ========================================
+const elements = {
+  chatArea: document.getElementById('chatArea'),
+  messageInput: document.getElementById('messageInput'),
+  sendBtn: document.getElementById('sendBtn'),
+  voiceBtn: document.getElementById('voiceBtn'),
+  statusToast: document.getElementById('statusToast')
+};
+
+// ========================================
+// Initialization
+// ========================================
+document.addEventListener('DOMContentLoaded', () => {
+  initializeEventListeners();
+  initializeSpeechRecognition();
+  adjustTextareaHeight();
+
+  // Focus input on load
+  elements.messageInput.focus();
+
+  console.log('AI Chat Assistant initialized');
+});
+
+// ========================================
+// Event Listeners
+// ========================================
+function initializeEventListeners() {
+  // Send button click
+  elements.sendBtn.addEventListener('click', handleSendMessage);
+
+  // Voice button click
+  elements.voiceBtn.addEventListener('click', handleVoiceToggle);
+
+  // Input field events
+  elements.messageInput.addEventListener('input', handleInputChange);
+  elements.messageInput.addEventListener('keydown', handleKeyDown);
+
+  // Prevent form submission on Enter (we handle it manually)
+  elements.messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+    }
+  });
+}
+
+// ========================================
+// Message Handling
+// ========================================
+
+/**
+ * Handle sending a message
+ */
+function handleSendMessage() {
+  const message = elements.messageInput.value.trim();
+
+  if (!message) {
+    return;
+  }
+
+  // Add user message to chat
+  addMessage(message, 'user');
+
+  // Clear input
+  elements.messageInput.value = '';
+  adjustTextareaHeight();
+
+  // Focus back on input
+  elements.messageInput.focus();
+
+  // Simulate assistant response (in a real app, this would call an API)
+  setTimeout(() => {
+    addMessage(generateAssistantResponse(message), 'assistant');
+  }, 500 + Math.random() * 1000);
+}
+
+/**
+ * Add a message to the chat area
+ * @param {string} text - Message text
+ * @param {string} type - 'user' or 'assistant'
+ */
+function addMessage(text, type = 'user') {
+  // Remove welcome message if it exists
+  const welcomeMsg = elements.chatArea.querySelector('.welcome-message');
+  if (welcomeMsg) {
+    welcomeMsg.remove();
+  }
+
+  // Create message element
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${type}`;
+  messageEl.setAttribute('role', 'article');
+  messageEl.setAttribute('aria-label', `${type} message`);
+
+  // Create avatar
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.textContent = type === 'user' ? 'U' : 'AI';
+
+  // Create content wrapper
+  const content = document.createElement('div');
+  content.className = 'message-content';
+
+  // Create bubble
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
+  bubble.textContent = text;
+
+  // Create timestamp
+  const timestamp = document.createElement('div');
+  timestamp.className = 'message-timestamp';
+  timestamp.textContent = formatTime(new Date());
+
+  // Assemble message
+  content.appendChild(bubble);
+  content.appendChild(timestamp);
+  messageEl.appendChild(avatar);
+  messageEl.appendChild(content);
+
+  // Add to chat area
+  elements.chatArea.appendChild(messageEl);
+
+  // Auto-scroll to bottom
+  scrollToBottom();
+}
+
+/**
+ * Generate a simulated assistant response
+ * @param {string} userMessage - The user's message
+ * @returns {string} - Assistant's response
+ */
+function generateAssistantResponse(userMessage) {
+  // This is a simple demo response generator
+  // In a real application, this would call your AI API
+  const responses = [
+    `I understand you said: "${userMessage}". How can I help you further?`,
+    `That's an interesting point about "${userMessage}". Let me think about that.`,
+    `Thanks for sharing! Regarding "${userMessage}", here's what I think...`,
+    `I've received your message: "${userMessage}". I'm here to assist you!`
+  ];
+
+  return responses[Math.floor(Math.random() * responses.length)];
+}
+
+// ========================================
+// Voice Input (Web Speech API)
+// ========================================
+
+/**
+ * Initialize Speech Recognition
+ */
+function initializeSpeechRecognition() {
+  // Check for browser support
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    console.warn('Speech Recognition API not supported in this browser');
+    elements.voiceBtn.disabled = true;
+    elements.voiceBtn.title = 'Voice input not supported in this browser';
+    elements.voiceBtn.style.opacity = '0.5';
+    return;
+  }
+
+  // Create recognition instance
+  state.recognition = new SpeechRecognition();
+  state.recognition.continuous = true; // Keep listening
+  state.recognition.interimResults = true; // Get interim results
+  state.recognition.lang = 'en-US';
+  state.recognition.maxAlternatives = 1;
+
+  // Event: Recognition starts
+  state.recognition.onstart = () => {
+    console.log('Voice recognition started');
+    state.isRecording = true;
+    elements.voiceBtn.classList.add('recording');
+    elements.voiceBtn.setAttribute('aria-label', 'Stop voice input (recording)');
+    showToast('Listening... Speak now', 'info');
+  };
+
+  // Event: Recognition receives results
+  state.recognition.onresult = (event) => {
+    let interimTranscript = '';
+    let finalTranscript = '';
+
+    // Process results
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript + ' ';
+      } else {
+        interimTranscript += transcript;
+      }
+    }
+
+    // Update input field with transcript
+    if (finalTranscript) {
+      const currentValue = elements.messageInput.value;
+      elements.messageInput.value = currentValue + finalTranscript;
+      adjustTextareaHeight();
+      state.finalTranscript = '';
+    }
+
+    // Reset silence timer when speech is detected
+    resetSilenceTimer();
+  };
+
+  // Event: Recognition ends
+  state.recognition.onend = () => {
+    console.log('Voice recognition ended');
+    stopRecording();
+  };
+
+  // Event: Recognition error
+  state.recognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+
+    let errorMessage = 'Voice input error';
+    switch (event.error) {
+      case 'no-speech':
+        errorMessage = 'No speech detected. Please try again.';
+        break;
+      case 'audio-capture':
+        errorMessage = 'Microphone not available';
+        break;
+      case 'not-allowed':
+        errorMessage = 'Microphone permission denied';
+        break;
+      case 'network':
+        errorMessage = 'Network error occurred';
+        break;
+      default:
+        errorMessage = `Voice input error: ${event.error}`;
+    }
+
+    showToast(errorMessage, 'error');
+    stopRecording();
+  };
+}
+
+/**
+ * Handle voice button toggle
+ */
+function handleVoiceToggle() {
+  if (!state.recognition) {
+    showToast('Voice input not available', 'error');
+    return;
+  }
+
+  if (state.isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+/**
+ * Start voice recording
+ */
+function startRecording() {
+  try {
+    state.recognition.start();
+    resetSilenceTimer();
+  } catch (error) {
+    console.error('Error starting recognition:', error);
+    showToast('Could not start voice input', 'error');
+  }
+}
+
+/**
+ * Stop voice recording
+ */
+function stopRecording() {
+  if (!state.isRecording) return;
+
+  try {
+    state.recognition.stop();
+  } catch (error) {
+    console.error('Error stopping recognition:', error);
+  }
+
+  state.isRecording = false;
+  elements.voiceBtn.classList.remove('recording');
+  elements.voiceBtn.setAttribute('aria-label', 'Toggle voice input');
+  clearSilenceTimer();
+
+  // If we have text in the input, show a hint
+  if (elements.messageInput.value.trim()) {
+    showToast('Voice input stopped. Press Enter to send.', 'success');
+  }
+}
+
+/**
+ * Reset silence timer (auto-stop after silence)
+ */
+function resetSilenceTimer() {
+  clearSilenceTimer();
+
+  state.silenceTimer = setTimeout(() => {
+    if (state.isRecording) {
+      console.log('Auto-stopping due to silence');
+      stopRecording();
+    }
+  }, AUTO_STOP_SILENCE_MS);
+}
+
+/**
+ * Clear silence timer
+ */
+function clearSilenceTimer() {
+  if (state.silenceTimer) {
+    clearTimeout(state.silenceTimer);
+    state.silenceTimer = null;
+  }
+}
+
+// ========================================
+// Input Handling
+// ========================================
+
+/**
+ * Handle input field changes
+ */
+function handleInputChange(e) {
+  adjustTextareaHeight();
+
+  // Enable/disable send button based on input
+  const hasText = e.target.value.trim().length > 0;
+  elements.sendBtn.disabled = !hasText;
+}
+
+/**
+ * Handle keyboard shortcuts
+ * @param {KeyboardEvent} e - Keyboard event
+ */
+function handleKeyDown(e) {
+  // Enter key sends message (unless Shift is held for newline)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSendMessage();
+  }
+
+  // Escape key stops voice recording
+  if (e.key === 'Escape' && state.isRecording) {
+    e.preventDefault();
+    stopRecording();
+  }
+}
+
+/**
+ * Auto-adjust textarea height based on content
+ */
+function adjustTextareaHeight() {
+  const textarea = elements.messageInput;
+
+  // Reset height to calculate scrollHeight
+  textarea.style.height = 'auto';
+
+  // Set height based on scrollHeight (capped at max-height in CSS)
+  const newHeight = Math.min(textarea.scrollHeight, 120);
+  textarea.style.height = newHeight + 'px';
+}
+
+// ========================================
+// UI Utilities
+// ========================================
+
+/**
+ * Scroll chat area to bottom
+ */
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    elements.chatArea.scrollTop = elements.chatArea.scrollHeight;
+  });
+}
+
+/**
+ * Show toast notification
+ * @param {string} message - Toast message
+ * @param {string} type - Toast type: 'info', 'success', 'error', 'warning'
+ */
+function showToast(message, type = 'info') {
+  const toast = elements.statusToast;
+
+  // Clear existing classes and add new type
+  toast.className = 'status-toast';
+  toast.classList.add(type, 'show');
+  toast.textContent = message;
+
+  // Auto-hide after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, TOAST_DURATION);
+}
+
+/**
+ * Format time for message timestamps
+ * @param {Date} date - Date object
+ * @returns {string} - Formatted time string
+ */
+function formatTime(date) {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+// ========================================
+// Cleanup & Error Handling
+// ========================================
+
+/**
+ * Cleanup on page unload
+ */
+window.addEventListener('beforeunload', () => {
+  if (state.isRecording) {
+    stopRecording();
+  }
+});
+
+/**
+ * Global error handler
+ */
+window.addEventListener('error', (event) => {
+  console.error('Global error:', event.error);
+  showToast('An error occurred. Please try again.', 'error');
+});
+
+/**
+ * Handle unhandled promise rejections
+ */
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  showToast('An error occurred. Please try again.', 'error');
+});
+
+// ========================================
+// Export for testing (if needed)
+// ========================================
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    addMessage,
+    formatTime,
+    showToast,
+    handleSendMessage
+  };
+}

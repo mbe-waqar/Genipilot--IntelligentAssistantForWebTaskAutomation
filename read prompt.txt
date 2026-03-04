@@ -1,0 +1,15 @@
+Before making any changes, read and analyze the entire codebase carefully.
+
+Go through ALL files, folders, and configurations in this project to fully understand:
+- the overall architecture
+- how different modules/components interact
+- data flow and control flow
+- dependencies and configurations
+- the intended functionality of the project
+
+Do NOT modify any code yet.
+Do NOT suggest fixes yet.
+Do NOT refactor or optimize anything yet.
+
+Only confirm once you have fully read and understood the whole project and also read the claud.md file.
+If anything is unclear, list the questions or assumptions explicitly before proceeding.

@@ -1,0 +1,456 @@
+/**
+ * Login Page - JavaScript
+ * Handles authentication, form validation, and tab switching
+ */
+
+// ========================================
+// Constants
+// ========================================
+const TOAST_DURATION = 3000; // milliseconds
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 8;
+
+// ========================================
+// DOM Elements
+// ========================================
+const elements = {
+  // Tabs
+  loginTab: document.getElementById('loginTab'),
+  signupTab: document.getElementById('signupTab'),
+
+  // Forms
+  loginForm: document.getElementById('loginForm'),
+  signupForm: document.getElementById('signupForm'),
+  loginFormElement: document.getElementById('loginFormElement'),
+  signupFormElement: document.getElementById('signupFormElement'),
+
+  // Login Form Inputs
+  email: document.getElementById('email'),
+  password: document.getElementById('password'),
+  rememberMe: document.getElementById('rememberMe'),
+
+  // Signup Form Inputs
+  signupName: document.getElementById('signupName'),
+  signupEmail: document.getElementById('signupEmail'),
+  signupPassword: document.getElementById('signupPassword'),
+
+  // Buttons
+  googleBtn: document.getElementById('googleBtn'),
+  googleSignupBtn: document.getElementById('googleSignupBtn'),
+  forgotPassword: document.getElementById('forgotPassword'),
+  switchToSignup: document.getElementById('switchToSignup'),
+  switchToLogin: document.getElementById('switchToLogin'),
+  loginBtn: document.getElementById('loginBtn'),
+  signupBtn: document.getElementById('signupBtn'),
+
+  // Toast
+  toast: document.getElementById('toast')
+};
+
+// ========================================
+// Initialization
+// ========================================
+document.addEventListener('DOMContentLoaded', () => {
+  initializeEventListeners();
+  checkRememberedUser();
+  console.log('Login page initialized');
+});
+
+// ========================================
+// Event Listeners
+// ========================================
+function initializeEventListeners() {
+  // Tab switching
+  elements.loginTab.addEventListener('click', () => switchTab('login'));
+  elements.signupTab.addEventListener('click', () => switchTab('signup'));
+
+  // Form submissions
+  elements.loginFormElement.addEventListener('submit', handleLogin);
+  elements.signupFormElement.addEventListener('submit', handleSignup);
+
+  // Google authentication
+  elements.googleBtn.addEventListener('click', handleGoogleLogin);
+  elements.googleSignupBtn.addEventListener('click', handleGoogleSignup);
+
+  // Navigation links
+  elements.switchToSignup.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchTab('signup');
+  });
+
+  elements.switchToLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchTab('login');
+  });
+
+  elements.forgotPassword.addEventListener('click', handleForgotPassword);
+
+  // Real-time validation
+  elements.email.addEventListener('blur', () => validateEmail(elements.email));
+  elements.signupEmail.addEventListener('blur', () => validateEmail(elements.signupEmail));
+  elements.password.addEventListener('blur', () => validatePassword(elements.password));
+  elements.signupPassword.addEventListener('blur', () => validatePassword(elements.signupPassword));
+
+  // Clear error on input
+  [elements.email, elements.password, elements.signupName, elements.signupEmail, elements.signupPassword].forEach(input => {
+    input.addEventListener('input', () => {
+      input.classList.remove('error', 'shake');
+    });
+  });
+}
+
+// ========================================
+// Tab Switching
+// ========================================
+function switchTab(tab) {
+  if (tab === 'login') {
+    // Update tabs
+    elements.loginTab.classList.add('active');
+    elements.signupTab.classList.remove('active');
+    elements.loginTab.setAttribute('aria-selected', 'true');
+    elements.signupTab.setAttribute('aria-selected', 'false');
+
+    // Show/hide forms
+    elements.loginForm.classList.remove('hidden');
+    elements.signupForm.classList.add('hidden');
+
+    // Focus first input
+    setTimeout(() => elements.email.focus(), 100);
+  } else {
+    // Update tabs
+    elements.signupTab.classList.add('active');
+    elements.loginTab.classList.remove('active');
+    elements.signupTab.setAttribute('aria-selected', 'true');
+    elements.loginTab.setAttribute('aria-selected', 'false');
+
+    // Show/hide forms
+    elements.signupForm.classList.remove('hidden');
+    elements.loginForm.classList.add('hidden');
+
+    // Focus first input
+    setTimeout(() => elements.signupName.focus(), 100);
+  }
+}
+
+// ========================================
+// Form Validation
+// ========================================
+
+/**
+ * Validate email field
+ * @param {HTMLInputElement} input - Email input element
+ * @returns {boolean} - Whether email is valid
+ */
+function validateEmail(input) {
+  const email = input.value.trim();
+
+  if (!email) {
+    showFieldError(input, 'Email is required');
+    return false;
+  }
+
+  if (!EMAIL_REGEX.test(email)) {
+    showFieldError(input, 'Please enter a valid email');
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validate password field
+ * @param {HTMLInputElement} input - Password input element
+ * @returns {boolean} - Whether password is valid
+ */
+function validatePassword(input) {
+  const password = input.value;
+
+  if (!password) {
+    showFieldError(input, 'Password is required');
+    return false;
+  }
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    showFieldError(input, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validate name field
+ * @param {HTMLInputElement} input - Name input element
+ * @returns {boolean} - Whether name is valid
+ */
+function validateName(input) {
+  const name = input.value.trim();
+
+  if (!name) {
+    showFieldError(input, 'Name is required');
+    return false;
+  }
+
+  if (name.length < 2) {
+    showFieldError(input, 'Name must be at least 2 characters');
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Show field error
+ * @param {HTMLInputElement} input - Input element
+ * @param {string} message - Error message
+ */
+function showFieldError(input, message) {
+  input.classList.add('error', 'shake');
+  showToast(message, 'error');
+}
+
+// ========================================
+// Authentication Handlers
+// ========================================
+
+/**
+ * Handle login form submission
+ * @param {Event} e - Form submit event
+ */
+async function handleLogin(e) {
+  e.preventDefault();
+
+  // Validate inputs
+  const emailValid = validateEmail(elements.email);
+  const passwordValid = validatePassword(elements.password);
+
+  if (!emailValid || !passwordValid) {
+    return;
+  }
+
+  // Get form data
+  const email = elements.email.value.trim();
+  const password = elements.password.value;
+  const rememberMe = elements.rememberMe.checked;
+
+  // Disable button during submission
+  elements.loginBtn.disabled = true;
+  elements.loginBtn.textContent = 'Logging in...';
+
+  try {
+    // Simulate API call (replace with actual authentication)
+    await simulateApiCall();
+
+    // Save user data if remember me is checked
+    if (rememberMe) {
+      localStorage.setItem('rememberedEmail', email);
+    } else {
+      localStorage.removeItem('rememberedEmail');
+    }
+
+    // Store authentication token (example)
+    localStorage.setItem('authToken', 'example-token-' + Date.now());
+    localStorage.setItem('userEmail', email);
+
+    // Show success message
+    showToast('Login successful!', 'success');
+
+    // Redirect to main app (sidebar.html) after short delay
+    setTimeout(() => {
+      window.location.href = 'sidebar.html';
+    }, 1000);
+
+  } catch (error) {
+    console.error('Login error:', error);
+    showToast('Login failed. Please check your credentials.', 'error');
+    elements.loginBtn.disabled = false;
+    elements.loginBtn.textContent = 'Login';
+  }
+}
+
+/**
+ * Handle signup form submission
+ * @param {Event} e - Form submit event
+ */
+async function handleSignup(e) {
+  e.preventDefault();
+
+  // Validate inputs
+  const nameValid = validateName(elements.signupName);
+  const emailValid = validateEmail(elements.signupEmail);
+  const passwordValid = validatePassword(elements.signupPassword);
+
+  if (!nameValid || !emailValid || !passwordValid) {
+    return;
+  }
+
+  // Get form data
+  const name = elements.signupName.value.trim();
+  const email = elements.signupEmail.value.trim();
+  const password = elements.signupPassword.value;
+
+  // Disable button during submission
+  elements.signupBtn.disabled = true;
+  elements.signupBtn.textContent = 'Creating Account...';
+
+  try {
+    // Simulate API call (replace with actual registration)
+    await simulateApiCall();
+
+    // Store authentication token (example)
+    localStorage.setItem('authToken', 'example-token-' + Date.now());
+    localStorage.setItem('userEmail', email);
+    localStorage.setItem('userName', name);
+
+    // Show success message
+    showToast('Account created successfully!', 'success');
+
+    // Redirect to main app (sidebar.html) after short delay
+    setTimeout(() => {
+      window.location.href = 'sidebar.html';
+    }, 1000);
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    showToast('Signup failed. Please try again.', 'error');
+    elements.signupBtn.disabled = false;
+    elements.signupBtn.textContent = 'Sign Up';
+  }
+}
+
+/**
+ * Handle Google login
+ */
+async function handleGoogleLogin() {
+  try {
+    showToast('Opening Google authentication...', 'info');
+
+    // Simulate Google OAuth (replace with actual Google Sign-In implementation)
+    await simulateApiCall();
+
+    showToast('Google authentication coming soon!', 'warning');
+
+    // In a real implementation, you would:
+    // 1. Initialize Google Sign-In
+    // 2. Handle the OAuth flow
+    // 3. Get user credentials
+    // 4. Store authentication token
+    // 5. Redirect to main app
+
+  } catch (error) {
+    console.error('Google login error:', error);
+    showToast('Google login failed. Please try again.', 'error');
+  }
+}
+
+/**
+ * Handle Google signup
+ */
+async function handleGoogleSignup() {
+  // Same as Google login for OAuth
+  await handleGoogleLogin();
+}
+
+/**
+ * Handle forgot password
+ * @param {Event} e - Click event
+ */
+function handleForgotPassword(e) {
+  e.preventDefault();
+
+  const email = elements.email.value.trim();
+
+  if (!email) {
+    showToast('Please enter your email first', 'warning');
+    elements.email.focus();
+    return;
+  }
+
+  if (!EMAIL_REGEX.test(email)) {
+    showToast('Please enter a valid email', 'error');
+    elements.email.focus();
+    return;
+  }
+
+  // Simulate sending reset email
+  showToast(`Password reset link sent to ${email}`, 'success');
+
+  // In a real implementation:
+  // - Call API to send password reset email
+  // - Show confirmation message
+}
+
+// ========================================
+// Utility Functions
+// ========================================
+
+/**
+ * Check if user email is remembered
+ */
+function checkRememberedUser() {
+  const rememberedEmail = localStorage.getItem('rememberedEmail');
+
+  if (rememberedEmail) {
+    elements.email.value = rememberedEmail;
+    elements.rememberMe.checked = true;
+  }
+}
+
+/**
+ * Simulate API call (replace with actual API calls)
+ * @returns {Promise} - Resolves after delay
+ */
+function simulateApiCall() {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 1000 + Math.random() * 1000);
+  });
+}
+
+/**
+ * Show toast notification
+ * @param {string} message - Toast message
+ * @param {string} type - Toast type: 'info', 'success', 'error', 'warning'
+ */
+function showToast(message, type = 'info') {
+  const toast = elements.toast;
+
+  // Clear existing classes
+  toast.className = 'toast';
+  toast.classList.add(type, 'show');
+  toast.textContent = message;
+
+  // Auto-hide after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, TOAST_DURATION);
+}
+
+// ========================================
+// Keyboard Shortcuts
+// ========================================
+document.addEventListener('keydown', (e) => {
+  // Alt + L: Switch to Login tab
+  if (e.altKey && e.key === 'l') {
+    e.preventDefault();
+    switchTab('login');
+  }
+
+  // Alt + S: Switch to Signup tab
+  if (e.altKey && e.key === 's') {
+    e.preventDefault();
+    switchTab('signup');
+  }
+});
+
+// ========================================
+// Export for testing (if needed)
+// ========================================
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    validateEmail,
+    validatePassword,
+    validateName,
+    showToast,
+    switchTab
+  };
+}

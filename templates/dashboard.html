@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - Geni Pilot</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Cropper.js for profile picture cropping -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+
+    <style>
+        :root {
+            --sidebar-width: 250px;
+            --header-height: 60px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h4 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .sidebar-header .dashboard-logo {
+            max-width: 150px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .nav-menu {
+            padding: 20px 0;
+        }
+
+        .nav-menu .nav-item {
+            margin: 5px 0;
+        }
+
+        .nav-menu .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 25px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-menu .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: #3498db;
+        }
+
+        .nav-menu .nav-link.active {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: white;
+            border-left-color: #3498db;
+        }
+
+        .nav-menu .nav-link i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .page-header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        /* Summary Cards */
+        .summary-cards {
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            height: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-card .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .stat-card.blue .icon {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stat-card.green .icon {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .stat-card.orange .icon {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .stat-card.purple .icon {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .stat-card h6 {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            color: #95a5a6;
+            font-size: 0.9rem;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        .chart-container h5 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        /* Task Table */
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .table-container h5 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        /* Responsive Sidebar Toggle */
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Table Styles */
+        .custom-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .custom-table thead th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            padding: 15px;
+        }
+
+        .custom-table tbody td {
+            padding: 15px;
+            vertical-align: middle;
+        }
+
+        .custom-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .btn-details {
+            padding: 5px 15px;
+            font-size: 0.85rem;
+        }
+
+        /* Erase History Button */
+        #eraseHistoryBtn {
+            color: #6c757d;
+            border-color: #dee2e6;
+            border-radius: 8px;
+            padding: 8px 24px;
+            font-size: 0.875rem;
+            transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+        }
+
+        #eraseHistoryBtn:hover:not(:disabled) {
+            color: #dc3545;
+            border-color: #dc3545;
+            background-color: #fff5f5;
+        }
+
+        #eraseHistoryBtn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        /* Running task pulse animation */
+        .scheduled-task-running {
+            animation: taskRunningPulse 2s ease-in-out infinite;
+        }
+        @keyframes taskRunningPulse {
+            0%, 100% { box-shadow: 0 1px 4px rgba(52,152,219,0.15); }
+            50% { box-shadow: 0 2px 12px rgba(52,152,219,0.3); }
+        }
+
+        /* Toast notification animations */
+        @keyframes toastSlideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes toastSlideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Toggle Button (Mobile) -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img src="/assets/img/dashboard-logo.png" alt="AutoPlatform Logo" class="dashboard-logo">
+        </div>
+
+        <nav class="nav-menu">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#overview" onclick="switchSection('overview')">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Overview</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#profile" onclick="switchSection('profile')">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Profile</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#history" onclick="switchSection('history')">
+                        <i class="bi bi-clock-history"></i>
+                        <span>Automation History</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#scheduled" onclick="switchSection('scheduled')">
+                        <i class="bi bi-calendar-check"></i>
+                        <span>Scheduled Tasks</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#settings" onclick="switchSection('settings')">
+                        <i class="bi bi-gear"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Logout Button -->
+            <div style="position: absolute; bottom: 20px; width: 100%; padding: 0 15px;">
+                <button onclick="logout()" title="Logout" style="
+                    width: calc(100% - 20px);
+                    margin: 0 10px;
+                    background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.15));
+                    border: 1px solid rgba(231, 76, 60, 0.3);
+                    color: #e74c3c;
+                    padding: 12px;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.background='linear-gradient(135deg, rgba(231, 76, 60, 0.25), rgba(192, 57, 43, 0.25))'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(231, 76, 60, 0.3)';" onmouseout="this.style.background='linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.15))'; this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                    <i class="bi bi-power" style="font-size: 18px;"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Overview Section -->
+        <div class="content-section active" id="overview-section">
+            <div class="page-header">
+                <h2>Dashboard Overview</h2>
+                <p class="text-muted mb-0">Welcome back! Here's your automation summary.</p>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="row summary-cards">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-card blue">
+                        <div class="icon">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                        <h6>Total Tasks Executed</h6>
+                        <div class="value">45</div>
+                        <div class="label">All time</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-card green">
+                        <div class="icon">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </div>
+                        <h6>Success Rate</h6>
+                        <div class="value">87%</div>
+                        <div class="label">Last 30 days</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-card orange">
+                        <div class="icon">
+                            <i class="bi bi-clock-fill"></i>
+                        </div>
+                        <h6>Last Task Executed</h6>
+                        <div class="value" style="font-size: 1.2rem;">2025-11-14</div>
+                        <div class="label">15:30</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-card purple">
+                        <div class="icon">
+                            <i class="bi bi-star-fill"></i>
+                        </div>
+                        <h6>Subscription</h6>
+                        <div class="value" style="font-size: 1.5rem;">Free Plan</div>
+                        <div class="label"><a href="#" style="color: #3498db;">Upgrade</a></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="row">
+                <div class="col-lg-8 mb-4">
+                    <div class="chart-container">
+                        <h5><i class="bi bi-graph-up"></i> Tasks Executed Over Time</h5>
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-4 mb-4">
+                    <div class="chart-container">
+                        <h5><i class="bi bi-pie-chart"></i> Task Types Distribution</h5>
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task History Table -->
+            <div class="table-container">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5><i class="bi bi-table"></i> Recent Task History</h5>
+                    <div>
+                        <select class="form-select form-select-sm" id="statusFilter" onchange="filterTable()">
+                            <option value="all">All Status</option>
+                            <option value="success">Success</option>
+                            <option value="failed">Failed</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table custom-table" id="taskTable">
+                        <thead>
+                            <tr>
+                                <th>Task Name</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-status="success">
+                                <td><strong>Web Scraping - Product Prices</strong></td>
+                                <td>2025-11-14 15:30</td>
+                                <td><span class="status-badge status-success">Success</span></td>
+                                <td>2m 34s</td>
+                                <td><button class="btn btn-sm btn-outline-primary btn-details" onclick="showDetails('Task 1')">View</button></td>
+                            </tr>
+                            <tr data-status="success">
+                                <td><strong>Form Filling - Customer Registration</strong></td>
+                                <td>2025-11-13 10:15</td>
+                                <td><span class="status-badge status-success">Success</span></td>
+                                <td>1m 12s</td>
+                                <td><button class="btn btn-sm btn-outline-primary btn-details" onclick="showDetails('Task 2')">View</button></td>
+                            </tr>
+                            <tr data-status="failed">
+                                <td><strong>Click Automation - Newsletter Signup</strong></td>
+                                <td>2025-11-12 14:22</td>
+                                <td><span class="status-badge status-failed">Failed</span></td>
+                                <td>0m 45s</td>
+                                <td><button class="btn btn-sm btn-outline-primary btn-details" onclick="showDetails('Task 3')">View</button></td>
+                            </tr>
+                            <tr data-status="success">
+                                <td><strong>Web Scraping - News Articles</strong></td>
+                                <td>2025-11-11 09:00</td>
+                                <td><span class="status-badge status-success">Success</span></td>
+                                <td>3m 18s</td>
+                                <td><button class="btn btn-sm btn-outline-primary btn-details" onclick="showDetails('Task 4')">View</button></td>
+                            </tr>
+                            <tr data-status="pending">
+                                <td><strong>Form Filling - Survey Submission</strong></td>
+                                <td>2025-11-10 16:45</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>-</td>
+                                <td><button class="btn btn-sm btn-outline-primary btn-details" onclick="showDetails('Task 5')">View</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div class="content-section" id="profile-section">
+            <div class="page-header">
+                <h2>User Profile</h2>
+                <p class="text-muted mb-0">Manage your account information</p>
+            </div>
+            <div class="chart-container">
+                <div class="row">
+                    <div class="col-md-4 text-center mb-4">
+                        <div class="position-relative d-inline-block mb-3">
+                            <div id="profileAvatarContainer" style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; margin: 0 auto; background: #e9ecef; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="openProfileLightbox()">
+                                <svg id="defaultAvatar" width="150" height="150" viewBox="0 0 150 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="75" cy="75" r="75" fill="#dee2e6"/>
+                                    <circle cx="75" cy="55" r="28" fill="#adb5bd"/>
+                                    <ellipse cx="75" cy="130" rx="45" ry="40" fill="#adb5bd"/>
+                                </svg>
+                                <img id="profilePictureImg" src="" alt="Profile" style="width: 150px; height: 150px; object-fit: cover; display: none;">
+                            </div>
+                            <!-- Delete overlay emoji on top-right of avatar -->
+                            <span id="deleteAvatarOverlay" onclick="event.stopPropagation(); confirmRemoveProfilePicture();" style="
+                                display: none;
+                                position: absolute;
+                                top: 2px;
+                                right: 2px;
+                                width: 28px;
+                                height: 28px;
+                                background: rgba(220,53,69,0.85);
+                                border-radius: 50%;
+                                cursor: pointer;
+                                font-size: 14px;
+                                line-height: 28px;
+                                text-align: center;
+                                color: #fff;
+                                transition: background 0.2s, transform 0.2s;
+                                z-index: 2;
+                            " onmouseover="this.style.background='rgba(220,53,69,1)'; this.style.transform='scale(1.15)'" onmouseout="this.style.background='rgba(220,53,69,0.85)'; this.style.transform='scale(1)'">
+                                <i class="bi bi-x-lg" style="font-size: 13px;"></i>
+                            </span>
+                        </div>
+                        <div class="mb-2">
+                            <label for="profilePictureInput" class="btn btn-sm btn-outline-primary me-1">
+                                <i class="bi bi-camera"></i> Upload Photo
+                            </label>
+                            <input type="file" id="profilePictureInput" accept="image/*" style="display: none;" onchange="onProfilePictureSelected(event)">
+                        </div>
+                        <h4 id="profileDisplayName">-</h4>
+                        <p class="text-muted" id="profileDisplayEmail">-</p>
+                        <span class="badge bg-success">Free Plan</span>
+                    </div>
+                    <div class="col-md-8">
+                        <h5 class="mb-3">Profile Information</h5>
+                        <form id="profileForm" onsubmit="updateUserProfile(event)">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="profileName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="profileEmail" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Gender</label>
+                                <select class="form-select" id="profileGender">
+                                    <option value="">Select gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" class="form-control" id="profilePhone" placeholder="e.g. +92XXXXX">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Company</label>
+                                <input type="text" class="form-control" id="profileCompany" placeholder="Your company name">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="profileSaveBtn">Update Profile</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Automation History Section -->
+        <div class="content-section" id="history-section">
+            <div class="page-header">
+                <h2>Automation History</h2>
+                <p class="text-muted mb-0">Complete history of all executed tasks</p>
+            </div>
+            <div class="table-container">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>All Tasks</h5>
+                    <input type="text" class="form-control form-control-sm" style="max-width: 300px;" placeholder="Search tasks..." id="searchInput" onkeyup="searchTable()">
+                </div>
+                <div class="table-responsive">
+                    <table class="table custom-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Task Name</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>#001</td>
+                                <td>Web Scraping - Product Prices</td>
+                                <td>Scraping</td>
+                                <td>2025-11-14 15:30</td>
+                                <td><span class="status-badge status-success">Success</span></td>
+                                <td>2m 34s</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Details</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Retry</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>#002</td>
+                                <td>Form Filling - Customer Registration</td>
+                                <td>Form Filling</td>
+                                <td>2025-11-13 10:15</td>
+                                <td><span class="status-badge status-success">Success</span></td>
+                                <td>1m 12s</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Details</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Retry</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>#003</td>
+                                <td>Click Automation - Newsletter Signup</td>
+                                <td>Click Automation</td>
+                                <td>2025-11-12 14:22</td>
+                                <td><span class="status-badge status-failed">Failed</span></td>
+                                <td>0m 45s</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">Details</button>
+                                    <button class="btn btn-sm btn-outline-secondary">Retry</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <hr class="mt-4 mb-3">
+                <div class="text-center">
+                    <button id="eraseHistoryBtn" class="btn btn-outline-secondary" onclick="eraseHistory()">
+                        <i class="bi bi-trash"></i> Erase History
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scheduled Tasks Section -->
+        <div class="content-section" id="scheduled-section">
+            <div class="page-header">
+                <h2>Scheduled Tasks</h2>
+                <p class="text-muted mb-0">Manage your automated task schedules</p>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="chart-container">
+                        <h5><i class="bi bi-calendar-event"></i> Active Schedules</h5>
+                        <div class="list-group" id="activeSchedulesList">
+                            <!-- Dynamic content loaded from dashboard.js -->
+                            <div class="list-group-item text-center text-muted">
+                                Loading scheduled tasks...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="chart-container">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create New Schedule</h5>
+                            <div class="text-end">
+                                <small class="text-muted d-block">Current Time</small>
+                                <strong id="currentTimeClock" style="color: #3498db; font-size: 1.1rem;">--:--:--</strong>
+                            </div>
+                        </div>
+                        <form id="createScheduledTaskForm" onsubmit="createScheduledTask(event)">
+                            <div class="mb-3">
+                                <label class="form-label">What should the automation do?</label>
+                                <textarea name="automation_prompt" class="form-control" rows="3" placeholder="e.g., Go to LinkedIn and check my notifications" required></textarea>
+                                <small class="text-muted">This will be both the task name and automation instruction</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">When to run?</label>
+                                <select name="frequency" class="form-select" id="frequencySelect" onchange="updateScheduleTimeFields()" required>
+                                    <option value="once">Once (run one time)</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="hourly">Hourly</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="dayOfWeekField" style="display: none;">
+                                <label class="form-label">Day of Week</label>
+                                <select name="day_of_week" class="form-select">
+                                    <option value="MON">Monday</option>
+                                    <option value="TUE">Tuesday</option>
+                                    <option value="WED">Wednesday</option>
+                                    <option value="THU">Thursday</option>
+                                    <option value="FRI">Friday</option>
+                                    <option value="SAT">Saturday</option>
+                                    <option value="SUN">Sunday</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="dateTimeField">
+                                <label class="form-label" id="timeLabel">Run at (current time)</label>
+                                <div class="row">
+                                    <div class="col-6" id="dateField" style="display: none;">
+                                        <label class="form-label small">Date</label>
+                                        <input type="date" name="date" class="form-control" id="scheduledDate">
+                                    </div>
+                                    <div class="col-12" id="timeFieldCol">
+                                        <label class="form-label small">Time</label>
+                                        <input type="time" name="time" class="form-control" id="scheduledTime" required>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Default is current time. Adjust as needed.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus-circle"></i> Schedule Task
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="content-section" id="settings-section">
+            <div class="page-header">
+                <h2>Settings</h2>
+                <p class="text-muted mb-0">Configure your dashboard preferences</p>
+            </div>
+            <div class="chart-container">
+                <h5 class="mb-4">Notification Settings</h5>
+                <form id="settingsForm" onsubmit="saveSettings(event)">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="emailNotif">
+                            <label class="form-check-label" for="emailNotif">Email notifications</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="taskNotif">
+                            <label class="form-check-label" for="taskNotif">Task completion notifications</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="errorNotif">
+                            <label class="form-check-label" for="errorNotif">Error alerts</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="settingsSaveBtn">Save Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div class="modal fade" id="taskDetailsModal" tabindex="-1" aria-labelledby="taskDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="taskDetailsModalLabel">Task Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="taskDetailsModalBody">
+                    <!-- Dynamic content populated by JS -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduled Task Details Modal -->
+    <div class="modal fade" id="scheduledTaskDetailsModal" tabindex="-1" aria-labelledby="scheduledTaskDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scheduledTaskDetailsModalLabel">Scheduled Task Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="scheduledTaskDetailsModalBody">
+                    <!-- Dynamic content populated by JS -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Picture Crop Modal -->
+    <div class="modal fade" id="cropModal" tabindex="-1" aria-labelledby="cropModalLabel" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cropModalLabel">Crop Profile Picture</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div style="max-height: 400px; overflow: hidden;">
+                        <img id="cropImage" src="" alt="Crop preview" style="max-width: 100%; display: block;">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="cropSaveBtn" onclick="saveCroppedImage()">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Picture Lightbox -->
+    <div id="profileLightbox" onclick="closeProfileLightbox(event)" style="
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.8);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    ">
+        <span onclick="closeProfileLightbox(event)" style="
+            position: absolute;
+            top: 18px; right: 28px;
+            color: #fff;
+            font-size: 32px;
+            cursor: pointer;
+            line-height: 1;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+            z-index: 10000;
+        " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">&times;</span>
+        <img id="lightboxImg" src="" alt="Profile Picture" style="
+            max-width: 90vw;
+            max-height: 85vh;
+            border-radius: 12px;
+            object-fit: contain;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+            pointer-events: none;
+        ">
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Dynamic Dashboard Script -->
+    <script src="/js/dashboard.js"></script>
+
+    <script>
+        // Navigation Functions
+        function switchSection(sectionName, pushHash) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            // Show selected section
+            const sectionEl = document.getElementById(sectionName + '-section');
+            if (sectionEl) {
+                sectionEl.classList.add('active');
+            }
+
+            // Add active class to matching nav link
+            const navLink = document.querySelector(`.nav-link[onclick*="'${sectionName}'"]`);
+            if (navLink) {
+                navLink.classList.add('active');
+            }
+
+            // Persist section in URL hash (skip if called from popstate/init)
+            if (pushHash !== false) {
+                history.replaceState(null, '', '#' + sectionName);
+            }
+
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+
+        // Restore active section from URL hash on page load
+        (function restoreSectionFromHash() {
+            const hash = window.location.hash.replace('#', '');
+            const validSections = ['overview', 'profile', 'history', 'scheduled', 'settings'];
+            if (hash && validSections.includes(hash)) {
+                switchSection(hash, false);
+            }
+        })();
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('show');
+        }
+
+        function updateScheduleTimeFields() {
+            const frequency = document.getElementById('frequencySelect').value;
+            const dayOfWeekField = document.getElementById('dayOfWeekField');
+            const timeLabel = document.getElementById('timeLabel');
+            const dateField = document.getElementById('dateField');
+            const timeFieldCol = document.getElementById('timeFieldCol');
+
+            // Reset displays
+            dayOfWeekField.style.display = 'none';
+            dateField.style.display = 'none';
+            timeFieldCol.className = 'col-12';
+
+            if (frequency === 'once') {
+                timeLabel.textContent = 'Run at (current time)';
+                dateField.style.display = 'block';
+                timeFieldCol.className = 'col-6';
+
+                // Set default date to today
+                const today = new Date();
+                document.getElementById('scheduledDate').value = today.toISOString().split('T')[0];
+            } else if (frequency === 'weekly') {
+                dayOfWeekField.style.display = 'block';
+                timeLabel.textContent = 'Run at (current time)';
+            } else if (frequency === 'hourly') {
+                timeLabel.textContent = 'Run at minute (of the hour)';
+            } else {
+                timeLabel.textContent = 'Run at (current time)';
+            }
+        }
+
+        // Set default time to current time
+        function setDefaultTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeInput = document.getElementById('scheduledTime');
+
+            if (timeInput && !timeInput.value) {
+                timeInput.value = `${hours}:${minutes}`;
+            }
+        }
+
+        // Initialize default time when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setDefaultTime();
+            updateScheduleTimeFields(); // Initialize form fields based on default frequency
+            // Update time every minute
+            setInterval(setDefaultTime, 60000);
+        });
+
+        // Update current time clock
+        function updateCurrentTimeClock() {
+            const clockElement = document.getElementById('currentTimeClock');
+            if (clockElement) {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                clockElement.textContent = timeString;
+            }
+        }
+
+        // Start current time clock
+        setInterval(updateCurrentTimeClock, 1000);
+        updateCurrentTimeClock(); // Update immediately
+
+        // Chart.js - Line Chart (make it globally accessible)
+        const lineCtx = document.getElementById('lineChart').getContext('2d');
+        window.lineChart = new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Tasks Executed',
+                    data: [12, 8, 15, 10, 14, 7, 9],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 5
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Chart.js - Pie Chart (make it globally accessible)
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        window.pieChart = new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Scraping', 'Form Filling', 'Click Automation'],
+                datasets: [{
+                    data: [50, 30, 20],
+                    backgroundColor: [
+                        '#667eea',
+                        '#f093fb',
+                        '#4facfe'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+
+        // Filter Table by Status
+        function filterTable() {
+            const filter = document.getElementById('statusFilter').value;
+            const rows = document.querySelectorAll('#taskTable tbody tr');
+
+            rows.forEach(row => {
+                if (filter === 'all' || row.dataset.status === filter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Search Table
+        function searchTable() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#history-section table tbody tr');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
+
+        // Show Task Details (delegates to dashboard.js showTaskDetails for real data,
+        // but this handles the hardcoded overview table rows)
+        function showDetails(taskName) {
+            // For static rows that don't have real IDs, show a simple modal
+            const modalBody = document.getElementById('taskDetailsModalBody');
+            modalBody.innerHTML = `
+                <h6>${taskName}</h6>
+                <p class="text-muted">This is a placeholder entry. Real task details are available in the Automation History section once you run tasks from the extension.</p>
+            `;
+            const modal = new bootstrap.Modal(document.getElementById('taskDetailsModal'));
+            modal.show();
+        }
+
+        // Logout Function
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                // Call the backend logout endpoint to clear session
+                fetch('/logout', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    // Clear any local storage if needed
+                    localStorage.clear();
+                    sessionStorage.clear();
+
+                    // Redirect to home page
+                    window.location.href = '/';
+                })
+                .catch(error => {
+                    console.error('Logout error:', error);
+                    // Still redirect even if there's an error
+                    window.location.href = '/';
+                });
+            }
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.querySelector('.sidebar-toggle');
+
+            if (window.innerWidth <= 768 &&
+                !sidebar.contains(event.target) &&
+                !toggle.contains(event.target) &&
+                sidebar.classList.contains('show')) {
+                sidebar.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>

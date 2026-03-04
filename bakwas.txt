@@ -1,0 +1,82 @@
+import os
+import asyncio
+import threading
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from browser_use import Browser, Agent, ChatOpenAI
+import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI()
+
+# Allow extension → backend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------
+# CONNECT TO CHROME VIA CDP
+# ---------------------------
+browser = Browser(
+    cdp_url="http://localhost:9222",
+    headless=False,
+    keep_alive=True,   # keep connection alive
+)
+
+# LLM
+llm = ChatOpenAI(model="gpt-4.1-mini")
+
+# Async loop running in background thread
+loop = asyncio.new_event_loop()
+threading.Thread(target=loop.run_forever, daemon=True).start()
+
+
+# Request body model
+class ChatRequest(BaseModel):
+    message: str
+
+
+def run_agent(task_text: str):
+    async def _run():
+        agent = Agent(
+            task=task_text,
+            browser=browser,
+            llm=llm,
+
+            # 🔥 IMPORTANT: prevent browser reset
+            reset=False,
+            keep_open=True,
+        )
+
+        result = await agent.run()
+        return result
+
+    # Run inside our background asyncio loop
+    future = asyncio.run_coroutine_threadsafe(_run(), loop)
+    return future.result()
+
+
+@app.post("/chat")
+async def chat(data: ChatRequest):
+    user_msg = data.message
+
+    result = run_agent(user_msg)
+
+    reply_text = getattr(result, "thoughts", "Task completed.")
+    actions = getattr(result, "actions", [])
+
+    return {"reply": reply_text, "actions": actions}
+
+
+if __name__ == "__main__":
+    os.environ["BROWSER_USE_TELEMETRY"] = "0"
+
+    # FastAPI server
+    uvicorn.run(app, host="127.0.0.1", port=5005)

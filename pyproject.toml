@@ -1,0 +1,30 @@
+[project]
+name = "fypauto"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiosmtplib>=5.0.0",
+    "apscheduler>=3.11.2",
+    "argon2-cffi>=25.1.0",
+    "browser-use>=0.9.7",
+    "email-validator>=2.3.0",
+    "fastapi>=0.121.3",
+    "google-auth>=2.43.0",
+    "google-auth-httplib2>=0.2.1",
+    "google-auth-oauthlib>=1.2.2",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
+    "langchain[anthropic,openai]>=1.0.8",
+    "motor>=3.7.1",
+    "openai>=2.8.1",
+    "openai-agents>=0.1.0",
+    "playwright>=1.56.0",
+    "pymongo>=4.15.4",
+    "python-dotenv>=1.0.1",
+    "python-multipart>=0.0.20",
+    "readability-lxml>=0.8.4.1",
+    "uvicorn>=0.38.0",
+    "websockets>=13.0.0",
+]

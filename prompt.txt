@@ -1,0 +1,132 @@
+STOP. DO NOT WRITE OR CHANGE ANY CODE YET.
+
+=====================================
+CRITICAL PROBLEM
+=====================================
+
+- User has **permanently blocked microphone** in Chrome settings
+- Voice input fails with:
+    ❌ Permission denied. Please try again.
+- Automation, multi-intent task handling, and agent success verification are already fixed
+- We must now **gracefully handle mic denial** while preserving system stability
+
+=====================================
+EXPECTED BEHAVIOR
+=====================================
+
+1️⃣ If microphone is permanently blocked:
+
+- Extension must detect the true permission state
+- Display a clear, actionable warning to the user:
+    "Microphone access permanently denied. Enable it in Chrome settings to use voice input."
+- **Do NOT attempt to start voice input**
+- Automation tasks must continue unaffected
+
+2️⃣ If microphone is temporarily denied:
+
+- Extension can prompt user to allow
+- Normal voice workflow resumes once allowed
+
+3️⃣ No regression:
+
+- Multi-intent tasks → single task entry  
+- Agent success verification → state-based checks  
+- Automation still runs in real Chrome tabs  
+- No false failures or crashes
+
+=====================================
+YOUR TASK — CREATE A SYSTEM PLAN
+=====================================
+
+Provide a STEP-BY-STEP plan covering:
+
+-------------------------------------
+1️⃣ PERMISSION DETECTION
+-------------------------------------
+
+- Use `navigator.permissions.query({name: "microphone"})` to detect:
+    - granted
+    - denied
+    - prompt
+- Detect permanent denial (`denied` + no prompt)
+- Differentiate from temporary denial
+
+-------------------------------------
+2️⃣ EXTENSION UI HANDLING
+-------------------------------------
+
+- If permanently denied:
+    - Show clear UI message in extension
+    - Disable voice button
+    - Provide instructions to enable in Chrome settings
+- If temporarily denied:
+    - Prompt user to allow
+    - Retry after user approval
+
+-------------------------------------
+3️⃣ BACKEND AND AGENT STABILITY
+-------------------------------------
+
+- Ensure mic permission failure **does not affect**:
+    - Multi-step tasks  
+    - Multi-intent single task handling  
+    - Agent post-condition verification  
+- Tasks continue via text input or other triggers
+- Do not auto-mark tasks failed because mic unavailable
+
+-------------------------------------
+4️⃣ LOGGING
+-------------------------------------
+
+- Log mic permission state:
+    - Denied
+    - Granted
+    - Prompt
+- Log attempted voice inputs
+- Avoid false "Permission denied" errors
+
+-------------------------------------
+5️⃣ FAILSAFE & FALLBACK
+-------------------------------------
+
+- If voice input unavailable:
+    - Allow user to type commands as fallback
+    - Ensure automation pipeline works normally
+    - No silent failure
+
+-------------------------------------
+6️⃣ EDGE CASES
+-------------------------------------
+
+- User blocks mic after already giving permission
+- User refreshes extension
+- Multiple tasks running
+- Human-in-the-loop tasks
+- Chrome or OS-level mic disconnection
+
+-------------------------------------
+7️⃣ STABILITY GUARANTEES
+-------------------------------------
+
+- No regression of:
+    - Multi-intent → single task
+    - Agent success verification
+    - Chrome automation in real tabs
+    - Task history accuracy
+
+=====================================
+IMPORTANT RULES
+=====================================
+
+- DO NOT implement code yet
+- Focus on **graceful handling** of mic permission
+- Keep previously fixed features stable
+- Ensure automation and task flow remain fully functional
+- Detect permanent vs temporary denial correctly
+
+=====================================
+FINAL INSTRUCTION
+=====================================
+
+Provide ONLY the detailed architectural plan for handling mic permission denial while preserving all other features.  
+Wait for approval before coding.
