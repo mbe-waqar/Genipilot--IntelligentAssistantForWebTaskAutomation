@@ -8,7 +8,7 @@ dependencies = [
     "aiosmtplib>=5.0.0",
     "apscheduler>=3.11.2",
     "argon2-cffi>=25.1.0",
-    "browser-use>=0.9.7",
+    "browser-use==0.12.2",
     "email-validator>=2.3.0",
     "fastapi>=0.121.3",
     "google-auth>=2.43.0",

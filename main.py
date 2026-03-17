@@ -12,10 +12,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 import secrets
+from contextlib import asynccontextmanager
 from typing import Optional, List
 import os
 from dotenv import load_dotenv
@@ -44,8 +45,49 @@ def serialize_datetime(obj):
     return obj
 
 
+# Lifespan context manager for startup and shutdown events
+@asynccontextmanager
+async def lifespan(app):
+    """Handle startup and shutdown events"""
+    # STARTUP
+    global mongo_client, db
+    try:
+        mongo_client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+        db = mongo_client[DATABASE_NAME]
+
+        # Test connection
+        mongo_client.server_info()
+
+        # Create unique index on email field for users
+        db[USERS_COLLECTION].create_index("email", unique=True)
+
+        # Create index on email and expiration for verification codes
+        db[VERIFICATION_CODES_COLLECTION].create_index("email")
+        db[VERIFICATION_CODES_COLLECTION].create_index("expires_at", expireAfterSeconds=0)
+
+        print(f"✓ Connected to MongoDB: {DATABASE_NAME}")
+
+        # Print Google OAuth config for debugging
+        if GOOGLE_CLIENT_ID:
+            print(f"✓ Google OAuth configured: {GOOGLE_CLIENT_ID[:20]}...{GOOGLE_CLIENT_ID[-20:]}")
+        else:
+            print(f"⚠️ WARNING: GOOGLE_CLIENT_ID is not set in .env file")
+
+    except Exception as e:
+        print(f"✗ Failed to connect to MongoDB: {e}")
+        print(f"  Make sure MongoDB is running at {MONGO_URL}")
+        db = None
+
+    yield  # App runs here
+
+    # SHUTDOWN
+    if mongo_client:
+        mongo_client.close()
+        print("✓ MongoDB connection closed")
+
+
 # Initialize FastAPI app
-app = FastAPI(title="MyApp - Authentication System")
+app = FastAPI(title="MyApp - Authentication System", lifespan=lifespan)
 
 # Add session middleware with a secure secret key
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
@@ -108,17 +150,18 @@ class UserSignup(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
 
-    class Config:
-        populate_by_name = True  # Allow both 'username' and 'name'
+    model_config = ConfigDict(populate_by_name=True)  # Allow both 'username' and 'name'
 
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def username_alphanumeric(cls, v):
         """Ensure username contains only alphanumeric characters and underscores"""
         if not v.replace('_', '').replace('-', '').replace(' ', '').isalnum():
             raise ValueError('Username must contain only letters, numbers, underscores, and hyphens')
         return v
 
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def password_strength(cls, v):
         """Validate password strength"""
         if len(v) < 8:
@@ -148,44 +191,6 @@ class GoogleAuthRequest(BaseModel):
 # Database Connection Events
 # ============================================================================
 
-@app.on_event("startup")
-def startup_db_client():
-    """Initialize MongoDB connection on startup"""
-    global mongo_client, db
-    try:
-        mongo_client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
-        db = mongo_client[DATABASE_NAME]
-
-        # Test connection
-        mongo_client.server_info()
-
-        # Create unique index on email field for users
-        db[USERS_COLLECTION].create_index("email", unique=True)
-
-        # Create index on email and expiration for verification codes
-        db[VERIFICATION_CODES_COLLECTION].create_index("email")
-        db[VERIFICATION_CODES_COLLECTION].create_index("expires_at", expireAfterSeconds=0)
-
-        print(f"✓ Connected to MongoDB: {DATABASE_NAME}")
-
-        # Print Google OAuth config for debugging
-        if GOOGLE_CLIENT_ID:
-            print(f"✓ Google OAuth configured: {GOOGLE_CLIENT_ID[:20]}...{GOOGLE_CLIENT_ID[-20:]}")
-        else:
-            print(f"⚠️ WARNING: GOOGLE_CLIENT_ID is not set in .env file")
-
-    except Exception as e:
-        print(f"✗ Failed to connect to MongoDB: {e}")
-        print(f"  Make sure MongoDB is running at {MONGO_URL}")
-        db = None
-
-
-@app.on_event("shutdown")
-def shutdown_db_client():
-    """Close MongoDB connection on shutdown"""
-    if mongo_client:
-        mongo_client.close()
-        print("✓ MongoDB connection closed")
 
 
 # ============================================================================
@@ -449,7 +454,12 @@ def signup_user(
             "email": user_data.email,
             "password": hashed_pw,
             "email_verified": False,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "settings": {
+                "email_notifications": False,
+                "task_notifications": False,
+                "error_alerts": False
+            }
         }
 
         # Insert user into database
@@ -588,7 +598,12 @@ async def api_signup_user(request: Request):
             "email": user_data.email,
             "password": hashed_pw,
             "email_verified": False,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "settings": {
+                "email_notifications": False,
+                "task_notifications": False,
+                "error_alerts": False
+            }
         }
 
         # Insert user into database
@@ -1095,7 +1110,12 @@ async def google_signup(request: Request, auth_request: GoogleAuthRequest):
                 "email_verified": email_verified,
                 "google_id": google_user_id,
                 "auth_provider": "google",
-                "created_at": datetime.utcnow()
+                "created_at": datetime.utcnow(),
+                "settings": {
+                    "email_notifications": False,
+                    "task_notifications": False,
+                    "error_alerts": False
+                }
             }
 
             result = db[USERS_COLLECTION].insert_one(user_doc)
@@ -1345,7 +1365,12 @@ def ext_signup(request: Request, user_data: UserSignup):
             "email": user_data.email,
             "password": hashed_pw,
             "email_verified": False,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "settings": {
+                "email_notifications": False,
+                "task_notifications": False,
+                "error_alerts": False
+            }
         }
 
         result = db[USERS_COLLECTION].insert_one(user_doc)
@@ -1935,7 +1960,8 @@ class UpdateProfileRequest(BaseModel):
     company: Optional[str] = None
     phone: Optional[str] = None
 
-    @validator('gender')
+    @field_validator('gender')
+    @classmethod
     def validate_gender(cls, v):
         if v is not None and v not in ('male', 'female', 'other'):
             raise ValueError('Gender must be male, female, or other')

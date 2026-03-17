@@ -26,95 +26,403 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
+            background-color: #F0F7F6;
         }
 
-        /* Sidebar Styles */
+        /* ========================================
+           Sidebar — Modern SaaS-style
+           ======================================== */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
             width: var(--sidebar-width);
-            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            overflow-y: auto;
+            background: linear-gradient(180deg, #0a2a25 0%, #0d3530 50%, #0a2a25 100%);
+            color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
             transition: transform 0.3s ease;
             z-index: 1000;
+            border-right: 1px solid rgba(255,255,255,0.04);
+            box-shadow: 4px 0 24px rgba(0,0,0,0.25);
         }
 
+        /* Logo / Branding */
         .sidebar-header {
-            padding: 20px;
+            padding: 28px 24px 22px;
             text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
         }
 
         .sidebar-header h4 {
             margin: 0;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .sidebar-header .dashboard-logo {
-            max-width: 150px;
+            max-width: 140px;
             height: auto;
-            margin-bottom: 10px;
+            margin-bottom: 4px;
+            opacity: 0.95;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-header .dashboard-logo:hover {
+            opacity: 1;
         }
 
+        /* Navigation Menu */
         .nav-menu {
-            padding: 20px 0;
+            padding: 12px 0;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* Custom scrollbar for nav */
+        .nav-menu::-webkit-scrollbar {
+            width: 4px;
+        }
+        .nav-menu::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .nav-menu::-webkit-scrollbar-thumb {
+            background: rgba(0,166,153,0.25);
+            border-radius: 4px;
         }
 
         .nav-menu .nav-item {
-            margin: 5px 0;
+            margin: 2px 12px;
         }
 
         .nav-menu .nav-link {
-            color: rgba(255, 255, 255, 0.8);
-            padding: 12px 25px;
+            color: rgba(255,255,255,0.55);
+            padding: 10px 14px;
             display: flex;
             align-items: center;
             text-decoration: none;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 450;
+            letter-spacing: 0.15px;
+            border: 1px solid transparent;
+            cursor: pointer;
         }
 
         .nav-menu .nav-link:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: white;
-            border-left-color: #3498db;
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.95);
+            transform: translateX(2px);
         }
 
         .nav-menu .nav-link.active {
-            background-color: rgba(52, 152, 219, 0.2);
-            color: white;
-            border-left-color: #3498db;
+            background: rgba(0,166,153,0.12);
+            color: #fff;
+            font-weight: 550;
+            border-color: rgba(0,166,153,0.15);
+            box-shadow: 0 0 16px rgba(0,166,153,0.08);
+        }
+
+        .nav-menu .nav-link.active i {
+            color: #00A699;
         }
 
         .nav-menu .nav-link i {
-            margin-right: 10px;
-            font-size: 1.2rem;
+            margin-right: 12px;
+            font-size: 1.15rem;
+            width: 20px;
+            text-align: center;
+            transition: color 0.2s ease;
+            color: rgba(255,255,255,0.4);
+        }
+
+        .nav-menu .nav-link:hover i {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .nav-menu .nav-link:focus-visible {
+            outline: 2px solid rgba(0,166,153,0.5);
+            outline-offset: -2px;
+        }
+
+        /* Bottom Section: Settings + Logout */
+        .sidebar-bottom {
+            flex-shrink: 0;
+            padding: 12px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar-bottom-link {
+            color: rgba(255,255,255,0.55);
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 450;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-bottom-link i {
+            margin-right: 12px;
+            font-size: 1.15rem;
+            width: 20px;
+            text-align: center;
+            color: rgba(255,255,255,0.4);
+            transition: color 0.2s ease;
+        }
+
+        .sidebar-bottom-link:hover {
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.95);
+            transform: translateX(2px);
+        }
+
+        .sidebar-bottom-link:hover i {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .sidebar-bottom-link.active {
+            background: rgba(0,166,153,0.12);
+            color: #fff;
+            font-weight: 550;
+            border-color: rgba(0,166,153,0.15);
+        }
+
+        .sidebar-bottom-link.active i {
+            color: #00A699;
+        }
+
+        .sidebar-bottom-link:focus-visible {
+            outline: 2px solid rgba(0,166,153,0.5);
+            outline-offset: -2px;
+        }
+
+        .sidebar-logout-btn {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid rgba(239,68,68,0.12);
+            border-radius: 8px;
+            background: rgba(239,68,68,0.06);
+            color: rgba(239,68,68,0.7);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-logout-btn i {
+            margin-right: 12px;
+            font-size: 1.15rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .sidebar-logout-btn:hover {
+            background: rgba(239,68,68,0.12);
+            color: #ef4444;
+            border-color: rgba(239,68,68,0.25);
+            transform: translateX(2px);
+        }
+
+        .sidebar-logout-btn:focus-visible {
+            outline: 2px solid rgba(239,68,68,0.4);
+            outline-offset: -2px;
         }
 
         /* Main Content Area */
         .main-content {
             margin-left: var(--sidebar-width);
-            padding: 30px;
+            padding: 32px;
             min-height: 100vh;
+            overflow-x: auto; /* Horizontal scroll when extension panel narrows viewport */
         }
 
         /* Header */
         .page-header {
-            background: white;
-            padding: 20px 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            margin-bottom: 30px;
+            background: #ffffff;
+            padding: 22px 28px;
+            border-radius: 14px;
+            border: 1px solid #D6E5E3;
+            box-shadow: 0 1px 3px rgba(1,107,97,0.04);
+            margin-bottom: 28px;
+        }
+
+        /* Overview Welcome Banner — extra padding */
+        #overview-section > .page-header {
+            padding: 36px 36px 32px;
+        }
+
+        #overview-section > .page-header h2 {
+            font-size: 1.65rem;
+            margin-bottom: 6px;
         }
 
         .page-header h2 {
             margin: 0;
-            color: #2c3e50;
+            color: #0d3530;
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-header h2 i {
+            font-size: 1.2rem;
+        }
+
+        .page-header .text-muted {
+            color: #4a5568 !important;
+            font-size: 0.9rem;
+        }
+
+        /* Section header — gradient banner like overview */
+        .section-header-accent {
+            background: linear-gradient(135deg, #0a2a25 0%, #016B61 55%, #00A699 100%) !important;
+            border: none !important;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(1,107,97,0.2);
+        }
+
+        .section-header-accent::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 160px;
+            height: 160px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 50%;
+        }
+
+        .section-header-accent::after {
+            content: '';
+            position: absolute;
+            bottom: -50px;
+            right: 70px;
+            width: 100px;
+            height: 100px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 50%;
+        }
+
+        .section-header-accent h2 {
+            color: #ffffff !important;
+            position: relative;
+            z-index: 1;
+        }
+
+        .section-header-accent h2 i {
+            color: rgba(255,255,255,0.85);
+        }
+
+        .section-header-accent .text-muted {
+            color: rgba(255,255,255,0.65) !important;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Profile page enhancements */
+        #profile-section .chart-container {
+            padding: 32px;
+        }
+
+        #profile-section h4 {
+            color: #0d3530;
+            font-weight: 700;
+        }
+
+        #profile-section .form-label {
+            color: #0d3530;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        #profile-section .form-control, #profile-section .form-select {
+            border-radius: 10px;
+            border: 1px solid #D6E5E3;
+            padding: 10px 14px;
+            transition: all 0.2s ease;
+        }
+
+        /* Settings page enhancements */
+        #settings-section .chart-container {
+            padding: 32px;
+        }
+
+        #settings-section .form-check {
+            padding: 14px 16px 14px 44px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border: 1px solid #E8F1EF;
+            transition: all 0.2s ease;
+        }
+
+        #settings-section .form-check:hover {
+            background: #F0F7F6;
+            border-color: rgba(1,107,97,0.15);
+        }
+
+        #settings-section .form-check-label {
+            color: #0d3530;
+            font-weight: 500;
+        }
+
+        /* List group enhancements */
+        .list-group-item {
+            border-color: #E8F1EF;
+            transition: all 0.2s ease;
+        }
+
+        .list-group-item:hover {
+            background: #F0F7F6;
+        }
+
+        /* Form select styling */
+        .form-select-sm {
+            border-radius: 8px;
+            border: 1px solid #D6E5E3;
+            font-size: 0.85rem;
+            padding: 6px 30px 6px 12px;
+        }
+
+        /* Modal enhancements */
+        .modal-content {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+
+        .modal-header {
+            border-bottom: 1px solid #E8F1EF;
+            padding: 20px 24px;
+        }
+
+        .modal-header .modal-title {
+            color: #0d3530;
             font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            border-top: 1px solid #E8F1EF;
+            padding: 16px 24px;
         }
 
         /* Content Sections */
@@ -128,123 +436,284 @@
 
         /* Summary Cards */
         .summary-cards {
-            margin-bottom: 30px;
+            margin-bottom: 28px;
         }
 
         .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-radius: 16px;
+            padding: 26px 24px;
+            border: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             height: 100%;
+            position: relative;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        /* Decorative blob */
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: -25px;
+            right: -25px;
+            width: 90px;
+            height: 90px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            right: 30px;
+            width: 55px;
+            height: 55px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
+            transition: transform 0.3s ease;
         }
 
         .stat-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+        }
+
+        .stat-card:hover::before {
+            transform: scale(1.2);
+        }
+
+        .stat-card:hover::after {
+            transform: scale(1.3) translateX(-5px);
         }
 
         .stat-card .icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 10px;
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 15px;
+            font-size: 1.4rem;
+            margin-bottom: 18px;
+            background: rgba(255,255,255,0.18);
+            color: #fff;
+            backdrop-filter: blur(4px);
         }
 
-        .stat-card.blue .icon {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        /* Card Gradients */
+        .stat-card.blue {
+            background: linear-gradient(135deg, #016B61 0%, #00A699 100%);
+            box-shadow: 0 6px 20px rgba(1,107,97,0.3);
         }
 
-        .stat-card.green .icon {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
+        .stat-card.green {
+            background: linear-gradient(135deg, #059669 0%, #34d399 100%);
+            box-shadow: 0 6px 20px rgba(5,150,105,0.3);
         }
 
-        .stat-card.orange .icon {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
+        .stat-card.orange {
+            background: linear-gradient(135deg, #0d7377 0%, #14b8a6 100%);
+            box-shadow: 0 6px 20px rgba(13,115,119,0.3);
         }
 
-        .stat-card.purple .icon {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-            color: white;
+        .stat-card.purple {
+            background: linear-gradient(135deg, #0a2a25 0%, #016B61 100%);
+            box-shadow: 0 6px 20px rgba(10,42,37,0.3);
         }
 
         .stat-card h6 {
-            color: #6c757d;
-            font-size: 0.85rem;
-            margin-bottom: 10px;
+            color: rgba(255,255,255,0.75);
+            font-size: 0.78rem;
+            margin-bottom: 8px;
             text-transform: uppercase;
             font-weight: 600;
+            letter-spacing: 0.5px;
+            position: relative;
+            z-index: 1;
         }
 
         .stat-card .value {
-            font-size: 2rem;
+            font-size: 1.9rem;
             font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 5px;
+            color: #ffffff;
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+            position: relative;
+            z-index: 1;
         }
 
         .stat-card .label {
-            color: #95a5a6;
+            color: rgba(255,255,255,0.6);
+            font-size: 0.85rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Clickable stat card */
+        .stat-card-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+            height: 100%;
+            cursor: pointer;
+        }
+        .stat-card-link:hover { color: inherit; text-decoration: none; }
+
+        .stat-card .card-action {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.7);
+            position: relative;
+            z-index: 1;
+            transition: all 0.25s ease;
+        }
+
+        .stat-card .card-action i {
             font-size: 0.9rem;
+            transition: transform 0.25s ease;
+        }
+
+        .stat-card:hover .card-action {
+            color: #fff;
+        }
+
+        .stat-card:hover .card-action i {
+            transform: translateX(4px);
         }
 
         /* Chart Containers */
         .chart-container {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            margin-bottom: 30px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 26px;
+            border: 1px solid rgba(1,107,97,0.08);
+            box-shadow: 0 2px 8px rgba(1,107,97,0.04);
+            margin-bottom: 28px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* When chart-container is inside a flex column, remove bottom margin */
+        .d-flex > .chart-container {
+            margin-bottom: 0;
+        }
+
+        .chart-container:hover {
+            box-shadow: 0 8px 24px rgba(1,107,97,0.1);
+            transform: translateY(-2px);
         }
 
         .chart-container h5 {
-            color: #2c3e50;
+            color: #0d3530;
             font-weight: 600;
             margin-bottom: 20px;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-container h5 i {
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #016B61, #00A699);
+            border-radius: 8px;
+            font-size: 0.85rem;
         }
 
         /* Task Table */
         .table-container {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 26px;
+            border: 1px solid rgba(1,107,97,0.08);
+            box-shadow: 0 2px 8px rgba(1,107,97,0.04);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .table-container:hover {
+            box-shadow: 0 8px 24px rgba(1,107,97,0.1);
+            transform: translateY(-2px);
         }
 
         .table-container h5 {
-            color: #2c3e50;
+            color: #0d3530;
             font-weight: 600;
             margin-bottom: 20px;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .table-container h5 i {
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #016B61, #00A699);
+            border-radius: 8px;
+            font-size: 0.85rem;
         }
 
         .status-badge {
-            padding: 5px 12px;
+            padding: 5px 14px;
             border-radius: 20px;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 600;
+            letter-spacing: 0.3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
         }
 
         .status-success {
-            background-color: #d4edda;
-            color: #155724;
+            background-color: rgba(5,150,105,0.1);
+            color: #059669;
+        }
+        .status-success::before {
+            background-color: #059669;
         }
 
         .status-failed {
-            background-color: #f8d7da;
-            color: #721c24;
+            background-color: rgba(220,38,38,0.08);
+            color: #dc2626;
+        }
+        .status-failed::before {
+            background-color: #dc2626;
         }
 
         .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
+            background-color: rgba(217,119,6,0.08);
+            color: #d97706;
+        }
+        .status-pending::before {
+            background-color: #d97706;
+            animation: pendingPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pendingPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
 
         /* Responsive Sidebar Toggle */
@@ -254,12 +723,18 @@
             top: 15px;
             left: 15px;
             z-index: 1001;
-            background: #2c3e50;
-            color: white;
-            border: none;
+            background: #0a2a25;
+            color: rgba(255,255,255,0.9);
+            border: 1px solid rgba(255,255,255,0.08);
             padding: 10px 15px;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .sidebar-toggle:hover {
+            background: #0d3530;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
         @media (max-width: 768px) {
@@ -282,20 +757,20 @@
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #f1f1f1;
+            background: #F0F7F6;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #888;
+            background: rgba(1,107,97,0.2);
             border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            background: rgba(1,107,97,0.35);
         }
 
         /* Table Styles */
@@ -305,46 +780,160 @@
         }
 
         .custom-table thead th {
-            background-color: #f8f9fa;
-            color: #2c3e50;
+            background-color: #F0F7F6;
+            color: #0d3530;
             font-weight: 600;
-            border-bottom: 2px solid #dee2e6;
-            padding: 15px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: none;
+            padding: 14px 16px;
+        }
+
+        .custom-table thead th:first-child {
+            border-radius: 10px 0 0 10px;
+        }
+
+        .custom-table thead th:last-child {
+            border-radius: 0 10px 10px 0;
         }
 
         .custom-table tbody td {
-            padding: 15px;
+            padding: 16px;
             vertical-align: middle;
+            color: #4a5568;
+            border-bottom: 1px solid #E8F1EF;
+            font-size: 0.92rem;
+        }
+
+        .custom-table tbody td strong {
+            color: #0d3530;
+            font-weight: 600;
+        }
+
+        .custom-table tbody tr {
+            transition: all 0.2s ease;
         }
 
         .custom-table tbody tr:hover {
-            background-color: #f8f9fa;
+            background-color: rgba(1,107,97,0.03);
+        }
+
+        .custom-table tbody tr:last-child td {
+            border-bottom: none;
         }
 
         .btn-details {
-            padding: 5px 15px;
-            font-size: 0.85rem;
-        }
-
-        /* Erase History Button */
-        #eraseHistoryBtn {
-            color: #6c757d;
-            border-color: #dee2e6;
+            padding: 6px 16px;
+            font-size: 0.82rem;
+            border-color: #016B61;
+            color: #016B61;
             border-radius: 8px;
-            padding: 8px 24px;
-            font-size: 0.875rem;
-            transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+            transition: all 0.2s ease;
+            font-weight: 500;
         }
 
-        #eraseHistoryBtn:hover:not(:disabled) {
-            color: #dc3545;
-            border-color: #dc3545;
-            background-color: #fff5f5;
+        .btn-details:hover {
+            background: #016B61;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(1,107,97,0.25);
         }
 
-        #eraseHistoryBtn:disabled {
-            opacity: 0.55;
+        .btn-outline-primary {
+            border-color: #016B61;
+            color: #016B61;
+        }
+
+        .btn-outline-primary:hover {
+            background: #016B61;
+            border-color: #016B61;
+            color: #fff;
+        }
+
+        .btn-primary {
+            background: #016B61;
+            border-color: #016B61;
+        }
+
+        .btn-primary:hover {
+            background: #014d46;
+            border-color: #014d46;
+        }
+
+        .btn-primary:focus {
+            box-shadow: 0 0 0 0.2rem rgba(1,107,97,0.25);
+        }
+
+        .btn-outline-secondary {
+            border-color: #D6E5E3;
+            color: #4a5568;
+            border-radius: 8px;
+        }
+
+        .btn-outline-secondary:hover {
+            background: #F0F7F6;
+            border-color: #016B61;
+            color: #016B61;
+        }
+
+        /* Form controls theme */
+        .form-control:focus, .form-select:focus {
+            border-color: #016B61;
+            box-shadow: 0 0 0 0.2rem rgba(1,107,97,0.15);
+        }
+
+        .form-check-input:checked {
+            background-color: #016B61;
+            border-color: #016B61;
+        }
+
+        .form-check-input:focus {
+            box-shadow: 0 0 0 0.2rem rgba(1,107,97,0.15);
+            border-color: #016B61;
+        }
+
+        .badge.bg-success {
+            background-color: #016B61 !important;
+        }
+
+        /* Erase/Delete Action Buttons */
+        .btn-erase {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #0a2a25, #016B61);
+            border: 1px solid rgba(1,107,97,0.3);
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(1,107,97,0.15);
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .btn-erase i {
+            font-size: 0.95rem;
+        }
+
+        .btn-erase:hover:not(:disabled) {
+            background: linear-gradient(135deg, #b91c1c, #e53935);
+            border-color: #e53935;
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(229,57,53,0.25);
+            transform: translateY(-1px);
+        }
+
+        .btn-erase:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(229,57,53,0.2);
+        }
+
+        .btn-erase:disabled {
+            opacity: 0.45;
             cursor: not-allowed;
+            box-shadow: none;
         }
 
         /* Running task pulse animation */
@@ -352,8 +941,8 @@
             animation: taskRunningPulse 2s ease-in-out infinite;
         }
         @keyframes taskRunningPulse {
-            0%, 100% { box-shadow: 0 1px 4px rgba(52,152,219,0.15); }
-            50% { box-shadow: 0 2px 12px rgba(52,152,219,0.3); }
+            0%, 100% { box-shadow: 0 1px 4px rgba(1,107,97,0.12); }
+            50% { box-shadow: 0 2px 12px rgba(1,107,97,0.25); }
         }
 
         /* Toast notification animations */
@@ -364,6 +953,221 @@
         @keyframes toastSlideOut {
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* ========================================
+           Voice Assistant Module
+           ======================================== */
+        .voice-assistant-card {
+            transition: all 0.4s ease;
+        }
+        .voice-assistant-card.disabled-look {
+            opacity: 0.55;
+            filter: grayscale(0.5);
+        }
+
+        /* Orb Container */
+        .voice-orb-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px 30px;
+        }
+        .voice-orb {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .voice-orb-inner {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            transition: all 0.5s ease;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .voice-orb-icon {
+            font-size: 36px;
+            color: #fff;
+            transition: all 0.3s ease;
+        }
+        .voice-orb-ring {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 120px; height: 120px;
+            margin-top: -60px; margin-left: -60px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            transition: all 0.5s ease;
+        }
+        .voice-orb-ring-2 {
+            width: 140px; height: 140px;
+            margin-top: -70px; margin-left: -70px;
+        }
+
+        /* State: Standby */
+        .voice-orb.standby .voice-orb-inner {
+            background: linear-gradient(135deg, #013228 0%, #026b61 100%);
+            animation: orbBreathe 3s ease-in-out infinite;
+        }
+        .voice-orb.standby .voice-orb-ring {
+            border-color: rgba(1,50,40,0.15);
+            animation: ringPulse 3s ease-in-out infinite;
+        }
+        .voice-orb.standby .voice-orb-ring-2 {
+            border-color: rgba(1,50,40,0.08);
+            animation: ringPulse 3s ease-in-out infinite 0.5s;
+        }
+        @keyframes orbBreathe {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 20px rgba(1,50,40,0.2); }
+            50% { transform: scale(1.04); box-shadow: 0 6px 30px rgba(1,50,40,0.35); }
+        }
+        @keyframes ringPulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.08); opacity: 1; }
+        }
+
+        /* State: Activated (listening for command) */
+        .voice-orb.activated .voice-orb-inner {
+            background: linear-gradient(135deg, #016B61 0%, #00A699 100%);
+            animation: orbGlow 1.2s ease-in-out infinite;
+            box-shadow: 0 0 40px rgba(1,107,97,0.5);
+        }
+        .voice-orb.activated .voice-orb-ring {
+            border-color: rgba(1,107,97,0.4);
+            animation: ringExpand 1.5s ease-out infinite;
+        }
+        .voice-orb.activated .voice-orb-ring-2 {
+            border-color: rgba(1,107,97,0.2);
+            animation: ringExpand 1.5s ease-out infinite 0.4s;
+        }
+        @keyframes orbGlow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        @keyframes ringExpand {
+            0% { transform: scale(0.9); opacity: 1; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+
+        /* State: Processing */
+        .voice-orb.processing .voice-orb-inner {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            animation: orbSpin 1.5s linear infinite;
+        }
+        @keyframes orbSpin {
+            0% { box-shadow: 0 0 20px rgba(243,156,18,0.3); }
+            50% { box-shadow: 0 0 40px rgba(243,156,18,0.6); }
+            100% { box-shadow: 0 0 20px rgba(243,156,18,0.3); }
+        }
+
+        /* State: Disabled */
+        .voice-orb.disabled .voice-orb-inner {
+            background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+
+        /* Status text */
+        .voice-status-text {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #0d3530;
+            transition: all 0.3s ease;
+        }
+        .voice-status-hint {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #718096;
+        }
+
+        /* Transcript display */
+        .voice-transcript-display {
+            margin-top: 20px;
+            padding: 16px 20px;
+            background: #F0F7F6;
+            border-radius: 12px;
+            border-left: 4px solid #016B61;
+            animation: fadeSlideUp 0.3s ease-out;
+        }
+        .voice-transcript-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .voice-transcript-text {
+            font-size: 16px;
+            color: #0d3530;
+            line-height: 1.5;
+            font-style: italic;
+        }
+
+        /* Feedback area */
+        .voice-feedback {
+            margin-top: 16px;
+            padding: 12px 18px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: fadeSlideUp 0.3s ease-out;
+        }
+        .voice-feedback.success {
+            background: rgba(5,150,105,0.08);
+            border: 1px solid rgba(5,150,105,0.15);
+            color: #059669;
+        }
+        .voice-feedback.error {
+            background: rgba(220,38,38,0.06);
+            border: 1px solid rgba(220,38,38,0.12);
+            color: #dc2626;
+        }
+        .voice-feedback-icon {
+            font-size: 18px;
+        }
+        .voice-feedback-message {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Command history items */
+        .voice-history-item {
+            border: none;
+            border-bottom: 1px solid #E8F1EF;
+            padding: 12px 16px;
+        }
+        .voice-history-item:last-child { border-bottom: none; }
+        .voice-history-command {
+            font-weight: 500;
+            color: #0d3530;
+            margin-bottom: 4px;
+        }
+        .voice-history-meta {
+            font-size: 12px;
+            color: #718096;
+        }
+        .voice-history-status {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .voice-history-status.sent { background: rgba(5,150,105,0.1); color: #059669; }
+        .voice-history-status.failed { background: rgba(220,38,38,0.08); color: #dc2626; }
+
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -376,7 +1180,10 @@
     <!-- Sidebar Navigation -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <img src="/assets/img/dashboard-logo.png" alt="AutoPlatform Logo" class="dashboard-logo">
+            <!-- Logo click redirects to the website home page -->
+            <a href="/" style="display: inline-block; cursor: pointer;">
+                <img src="/assets/img/dashboard-logo.png" alt="GeniPilot Logo" class="dashboard-logo">
+            </a>
         </div>
 
         <nav class="nav-menu">
@@ -406,106 +1213,124 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#settings" onclick="switchSection('settings')">
-                        <i class="bi bi-gear"></i>
-                        <span>Settings</span>
+                    <a class="nav-link" href="#voice" onclick="switchSection('voice')">
+                        <i class="bi bi-mic"></i>
+                        <span>Voice Assistant</span>
                     </a>
                 </li>
             </ul>
-
-            <!-- Logout Button -->
-            <div style="position: absolute; bottom: 20px; width: 100%; padding: 0 15px;">
-                <button onclick="logout()" title="Logout" style="
-                    width: calc(100% - 20px);
-                    margin: 0 10px;
-                    background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.15));
-                    border: 1px solid rgba(231, 76, 60, 0.3);
-                    color: #e74c3c;
-                    padding: 12px;
-                    border-radius: 12px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    font-weight: 500;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 10px;
-                    transition: all 0.3s ease;
-                " onmouseover="this.style.background='linear-gradient(135deg, rgba(231, 76, 60, 0.25), rgba(192, 57, 43, 0.25))'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(231, 76, 60, 0.3)';" onmouseout="this.style.background='linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.15))'; this.style.transform='translateY(0)'; this.style.boxShadow='none';">
-                    <i class="bi bi-power" style="font-size: 18px;"></i>
-                    <span>Logout</span>
-                </button>
-            </div>
         </nav>
+
+        <!-- Bottom Section: Settings + Logout -->
+        <div class="sidebar-bottom">
+            <a class="nav-link sidebar-bottom-link" href="#settings" onclick="switchSection('settings')">
+                <i class="bi bi-gear"></i>
+                <span>Settings</span>
+            </a>
+            <button class="sidebar-logout-btn" onclick="logout()" title="Logout">
+                <i class="bi bi-box-arrow-left"></i>
+                <span>Logout</span>
+            </button>
+        </div>
     </div>
 
     <!-- Main Content Area -->
     <div class="main-content">
         <!-- Overview Section -->
         <div class="content-section active" id="overview-section">
-            <div class="page-header">
-                <h2>Dashboard Overview</h2>
-                <p class="text-muted mb-0">Welcome back! Here's your automation summary.</p>
+            <div class="page-header section-header-accent">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2><i class="bi bi-rocket-takeoff-fill" style="margin-right: 10px; font-size: 1.4rem;"></i>Dashboard Overview</h2>
+                        <p class="text-muted mb-0">Welcome back! Here's your automation summary.</p>
+                    </div>
+                    <div class="d-none d-md-block" style="position: relative; z-index: 1;">
+                        <div style="background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 10px 18px; text-align: center;">
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.6); margin-bottom: 2px;">Today</div>
+                            <div id="overviewDate" style="font-size: 0.95rem; font-weight: 600; color: #fff;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Summary Cards -->
             <div class="row summary-cards">
                 <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-card blue">
-                        <div class="icon">
-                            <i class="bi bi-check-circle-fill"></i>
+                    <a class="stat-card-link" href="#history" onclick="switchSection('history')">
+                        <div class="stat-card blue">
+                            <div class="icon">
+                                <i class="bi bi-check-circle-fill"></i>
+                            </div>
+                            <h6>Total Tasks Executed</h6>
+                            <div class="value" id="statTotalTasks">0</div>
+                            <div class="label">All time</div>
+                            <div class="card-action">View history <i class="bi bi-arrow-right"></i></div>
                         </div>
-                        <h6>Total Tasks Executed</h6>
-                        <div class="value">45</div>
-                        <div class="label">All time</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-card green">
-                        <div class="icon">
-                            <i class="bi bi-graph-up-arrow"></i>
+                    <a class="stat-card-link" href="#history" onclick="switchSection('history')">
+                        <div class="stat-card green">
+                            <div class="icon">
+                                <i class="bi bi-graph-up-arrow"></i>
+                            </div>
+                            <h6>Success Rate</h6>
+                            <div class="value" id="statSuccessRate">0%</div>
+                            <div class="label">Last 30 days</div>
+                            <div class="card-action">View details <i class="bi bi-arrow-right"></i></div>
                         </div>
-                        <h6>Success Rate</h6>
-                        <div class="value">87%</div>
-                        <div class="label">Last 30 days</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-card orange">
-                        <div class="icon">
-                            <i class="bi bi-clock-fill"></i>
+                    <a class="stat-card-link" href="#scheduled" onclick="switchSection('scheduled')">
+                        <div class="stat-card orange">
+                            <div class="icon">
+                                <i class="bi bi-clock-fill"></i>
+                            </div>
+                            <h6>Scheduled Tasks</h6>
+                            <div class="value" id="statScheduledCount">0</div>
+                            <div class="label" id="statNextRun">Active schedules</div>
+                            <div class="card-action">Manage schedules <i class="bi bi-arrow-right"></i></div>
                         </div>
-                        <h6>Last Task Executed</h6>
-                        <div class="value" style="font-size: 1.2rem;">2025-11-14</div>
-                        <div class="label">15:30</div>
-                    </div>
+                    </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-card purple">
-                        <div class="icon">
-                            <i class="bi bi-star-fill"></i>
+                    <a class="stat-card-link" href="#settings" onclick="switchSection('settings')">
+                        <div class="stat-card purple">
+                            <div class="icon">
+                                <i class="bi bi-star-fill"></i>
+                            </div>
+                            <h6>Subscription</h6>
+                            <div class="value" style="font-size: 1.5rem;">Free Plan</div>
+                            <div class="label">Current plan</div>
+                            <div class="card-action">Upgrade plan <i class="bi bi-arrow-right"></i></div>
                         </div>
-                        <h6>Subscription</h6>
-                        <div class="value" style="font-size: 1.5rem;">Free Plan</div>
-                        <div class="label"><a href="#" style="color: #3498db;">Upgrade</a></div>
-                    </div>
+                    </a>
                 </div>
             </div>
 
-            <!-- Charts Section -->
-            <div class="row">
-                <div class="col-lg-8 mb-4">
-                    <div class="chart-container">
+            <!-- Charts Section — min-width wrapper prevents layout collapse when extension panel is open -->
+            <div style="min-width: 600px;">
+            <div class="row align-items-stretch">
+                <div class="col-lg-8 mb-4 d-flex">
+                    <div class="chart-container w-100 d-flex flex-column">
                         <h5><i class="bi bi-graph-up"></i> Tasks Executed Over Time</h5>
-                        <canvas id="lineChart"></canvas>
+                        <div class="flex-grow-1" style="position: relative; min-height: 250px;">
+                            <canvas id="lineChart"></canvas>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-4 mb-4">
-                    <div class="chart-container">
+                <div class="col-lg-4 mb-4 d-flex">
+                    <!-- flex-shrink: 0 prevents this card from compressing in narrow viewports -->
+                    <div class="chart-container w-100 d-flex flex-column" style="flex-shrink: 0; min-width: 280px;">
                         <h5><i class="bi bi-pie-chart"></i> Task Types Distribution</h5>
-                        <canvas id="pieChart"></canvas>
+                        <!-- Fixed-size wrapper keeps donut chart from shrinking -->
+                        <div class="flex-grow-1 d-flex align-items-center justify-content-center" style="min-height: 280px; overflow: hidden;">
+                            <canvas id="pieChart" width="280" height="280"></canvas>
+                        </div>
                     </div>
                 </div>
+            </div>
             </div>
 
             <!-- Task History Table -->
@@ -576,19 +1401,19 @@
 
         <!-- Profile Section -->
         <div class="content-section" id="profile-section">
-            <div class="page-header">
-                <h2>User Profile</h2>
+            <div class="page-header section-header-accent">
+                <h2><i class="bi bi-person-circle"></i> User Profile</h2>
                 <p class="text-muted mb-0">Manage your account information</p>
             </div>
             <div class="chart-container">
                 <div class="row">
                     <div class="col-md-4 text-center mb-4">
                         <div class="position-relative d-inline-block mb-3">
-                            <div id="profileAvatarContainer" style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; margin: 0 auto; background: #e9ecef; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="openProfileLightbox()">
+                            <div id="profileAvatarContainer" style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; margin: 0 auto; background: #F0F7F6; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 3px solid rgba(1,107,97,0.15); box-shadow: 0 4px 16px rgba(1,107,97,0.1); transition: all 0.3s ease;" onclick="openProfileLightbox()" onmouseover="this.style.boxShadow='0 6px 24px rgba(1,107,97,0.2)'; this.style.borderColor='rgba(1,107,97,0.3)'" onmouseout="this.style.boxShadow='0 4px 16px rgba(1,107,97,0.1)'; this.style.borderColor='rgba(1,107,97,0.15)'">
                                 <svg id="defaultAvatar" width="150" height="150" viewBox="0 0 150 150" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="75" cy="75" r="75" fill="#dee2e6"/>
-                                    <circle cx="75" cy="55" r="28" fill="#adb5bd"/>
-                                    <ellipse cx="75" cy="130" rx="45" ry="40" fill="#adb5bd"/>
+                                    <circle cx="75" cy="75" r="75" fill="#D6E5E3"/>
+                                    <circle cx="75" cy="55" r="28" fill="#9ECFD4"/>
+                                    <ellipse cx="75" cy="130" rx="45" ry="40" fill="#9ECFD4"/>
                                 </svg>
                                 <img id="profilePictureImg" src="" alt="Profile" style="width: 150px; height: 150px; object-fit: cover; display: none;">
                             </div>
@@ -660,8 +1485,8 @@
 
         <!-- Automation History Section -->
         <div class="content-section" id="history-section">
-            <div class="page-header">
-                <h2>Automation History</h2>
+            <div class="page-header section-header-accent">
+                <h2><i class="bi bi-clock-history"></i> Automation History</h2>
                 <p class="text-muted mb-0">Complete history of all executed tasks</p>
             </div>
             <div class="table-container">
@@ -724,8 +1549,8 @@
                 </div>
                 <hr class="mt-4 mb-3">
                 <div class="text-center">
-                    <button id="eraseHistoryBtn" class="btn btn-outline-secondary" onclick="eraseHistory()">
-                        <i class="bi bi-trash"></i> Erase History
+                    <button id="eraseHistoryBtn" class="btn-erase" onclick="eraseHistory()">
+                        <i class="bi bi-trash3"></i> Erase History
                     </button>
                 </div>
             </div>
@@ -733,8 +1558,8 @@
 
         <!-- Scheduled Tasks Section -->
         <div class="content-section" id="scheduled-section">
-            <div class="page-header">
-                <h2>Scheduled Tasks</h2>
+            <div class="page-header section-header-accent">
+                <h2><i class="bi bi-calendar-check"></i> Scheduled Tasks</h2>
                 <p class="text-muted mb-0">Manage your automated task schedules</p>
             </div>
             <div class="row">
@@ -755,7 +1580,7 @@
                             <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create New Schedule</h5>
                             <div class="text-end">
                                 <small class="text-muted d-block">Current Time</small>
-                                <strong id="currentTimeClock" style="color: #3498db; font-size: 1.1rem;">--:--:--</strong>
+                                <strong id="currentTimeClock" style="color: #016B61; font-size: 1.1rem;">--:--:--</strong>
                             </div>
                         </div>
                         <form id="createScheduledTaskForm" onsubmit="createScheduledTask(event)">
@@ -809,10 +1634,88 @@
             </div>
         </div>
 
+        <!-- Voice Assistant Section -->
+        <div class="content-section" id="voice-section">
+            <div class="page-header section-header-accent">
+                <h2><i class="bi bi-mic-fill"></i> Voice Assistant</h2>
+                <p class="text-muted mb-0">Control automation with your voice — say "Hey Geni" to activate</p>
+            </div>
+            <div class="row">
+                <div class="col-12 mb-4">
+                    <div class="chart-container voice-assistant-card" id="voiceAssistantCard">
+                        <!-- Toggle Row -->
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0"><i class="bi bi-mic"></i> Voice Assistant</h5>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="voiceAssistantToggle" style="width: 3em; height: 1.5em; cursor: pointer;">
+                                <label class="form-check-label fw-semibold" for="voiceAssistantToggle" style="cursor: pointer;">OFF</label>
+                            </div>
+                        </div>
+
+                        <!-- Unsupported Browser Warning -->
+                        <div id="voiceUnsupported" class="alert alert-warning d-none">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            Your browser does not support the Web Speech API. Please use Google Chrome for voice features.
+                        </div>
+
+                        <!-- Mic Permission Error -->
+                        <div id="voiceMicError" class="alert alert-danger d-none">
+                            <i class="bi bi-mic-mute-fill"></i>
+                            <strong>Microphone access denied.</strong> Please allow microphone access in your browser settings, then reload this page.
+                        </div>
+
+                        <!-- Voice Orb Container -->
+                        <div class="voice-orb-container" id="voiceOrbContainer">
+                            <div class="voice-orb disabled" id="voiceOrb">
+                                <div class="voice-orb-inner">
+                                    <i class="bi bi-mic-fill voice-orb-icon"></i>
+                                </div>
+                                <div class="voice-orb-ring"></div>
+                                <div class="voice-orb-ring voice-orb-ring-2"></div>
+                            </div>
+                            <div class="voice-status-text" id="voiceStatusText">Disabled</div>
+                            <div class="voice-status-hint" id="voiceStatusHint">Turn on the toggle to start</div>
+                        </div>
+
+                        <!-- Live Transcript Display -->
+                        <div class="voice-transcript-display" id="voiceTranscriptDisplay" style="display: none;">
+                            <div class="voice-transcript-label">
+                                <i class="bi bi-chat-quote"></i> You said:
+                            </div>
+                            <div class="voice-transcript-text" id="voiceTranscriptText"></div>
+                        </div>
+
+                        <!-- Feedback Area -->
+                        <div class="voice-feedback" id="voiceFeedback" style="display: none;">
+                            <i class="voice-feedback-icon" id="voiceFeedbackIcon"></i>
+                            <span class="voice-feedback-message" id="voiceFeedbackMessage"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Voice Commands -->
+                <div class="col-12 mb-4">
+                    <div class="chart-container">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Voice Commands</h5>
+                            <button id="eraseVoiceHistoryBtn" class="btn-erase" onclick="eraseVoiceHistory()" disabled>
+                                <i class="bi bi-trash3"></i> Erase History
+                            </button>
+                        </div>
+                        <div class="list-group" id="voiceCommandHistory">
+                            <div class="list-group-item text-center text-muted">
+                                No voice commands yet
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Settings Section -->
         <div class="content-section" id="settings-section">
-            <div class="page-header">
-                <h2>Settings</h2>
+            <div class="page-header section-header-accent">
+                <h2><i class="bi bi-gear-fill"></i> Settings</h2>
                 <p class="text-muted mb-0">Configure your dashboard preferences</p>
             </div>
             <div class="chart-container">
@@ -971,10 +1874,19 @@
             }
         }
 
+        // Set today's date in overview banner
+        (function() {
+            const el = document.getElementById('overviewDate');
+            if (el) {
+                const d = new Date();
+                el.textContent = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+        })();
+
         // Restore active section from URL hash on page load
         (function restoreSectionFromHash() {
             const hash = window.location.hash.replace('#', '');
-            const validSections = ['overview', 'profile', 'history', 'scheduled', 'settings'];
+            const validSections = ['overview', 'profile', 'history', 'scheduled', 'voice', 'settings'];
             if (hash && validSections.includes(hash)) {
                 switchSection(hash, false);
             }
@@ -1062,11 +1974,11 @@
                 datasets: [{
                     label: 'Tasks Executed',
                     data: [12, 8, 15, 10, 14, 7, 9],
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderColor: '#016B61',
+                    backgroundColor: 'rgba(1, 107, 97, 0.08)',
                     tension: 0.4,
                     fill: true,
-                    pointBackgroundColor: '#667eea',
+                    pointBackgroundColor: '#016B61',
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2,
                     pointRadius: 5,
@@ -1088,7 +2000,7 @@
                             stepSize: 5
                         },
                         grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
+                            color: 'rgba(1, 107, 97, 0.06)'
                         }
                     },
                     x: {
@@ -1109,9 +2021,9 @@
                 datasets: [{
                     data: [50, 30, 20],
                     backgroundColor: [
-                        '#667eea',
-                        '#f093fb',
-                        '#4facfe'
+                        '#016B61',
+                        '#70B2B2',
+                        '#9ECFD4'
                     ],
                     borderWidth: 0
                 }]
@@ -1124,7 +2036,9 @@
                         position: 'bottom',
                         labels: {
                             padding: 20,
-                            usePointStyle: true
+                            usePointStyle: true,
+                            /* Fixed px font size so legend text doesn't scale when container shrinks */
+                            font: { size: 13 }
                         }
                     }
                 }

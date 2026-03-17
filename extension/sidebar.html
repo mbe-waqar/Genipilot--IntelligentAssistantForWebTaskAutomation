@@ -30,7 +30,7 @@
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
         <h2>Welcome!</h2>
-        <p>Start a conversation or use voice input to chat.</p>
+        <p>Start a conversation to chat.</p>
       </div>
 
       <!-- Messages will be dynamically inserted here -->
@@ -38,30 +38,6 @@
 
     <!-- Composer Bar -->
     <div class="composer-bar">
-
-      <!-- Inline Voice Transcript Bar (visible only while recording) -->
-      <div id="voiceTranscriptBar" class="voice-transcript-bar" style="display: none;">
-        <div class="voice-transcript-content">
-          <span class="voice-recording-dot"></span>
-          <span id="voiceLiveText" class="voice-live-text"></span>
-        </div>
-        <button id="voiceCancelBtn" class="voice-cancel-btn" title="Cancel recording" aria-label="Cancel voice recording">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Mic Denied Banner (shown only when mic is permanently blocked) -->
-      <div id="micDeniedBanner" class="mic-denied-banner" style="display:none;" role="alert">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-          <line x1="1" y1="1" x2="23" y2="23"></line>
-        </svg>
-        <span class="mic-denied-text">Microphone permanently blocked. Go to <strong>Chrome → Settings → Privacy and security → Site settings → Microphone</strong> to allow it.</span>
-        <button id="micDeniedDismiss" class="mic-denied-dismiss" aria-label="Dismiss microphone warning" type="button">×</button>
-      </div>
 
       <div class="composer-container">
         <!-- Multi-line input -->
@@ -92,21 +68,20 @@
             </svg>
           </button>
 
-          <!-- Voice Input Button -->
+          <!-- Speaker Toggle Button (visible only during audio playback) -->
           <button
-            id="voiceBtn"
-            class="voice-btn"
-            aria-label="Toggle voice input"
-            title="Click to use voice input"
+            id="speakerToggleBtn"
+            class="speaker-toggle-btn"
+            aria-label="Toggle audio"
+            title="Audio playing — click to mute"
             type="button"
+            style="display: none;"
           >
-            <svg class="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             </svg>
-            <span class="recording-indicator" aria-hidden="true"></span>
           </button>
 
           <!-- Send Button -->

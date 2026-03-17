@@ -6,7 +6,7 @@ Handles automation history, scheduled tasks, and user data tracking
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 import os
 
@@ -46,8 +46,7 @@ class AutomationHistory(BaseModel):
     final_result: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class ScheduledTask(BaseModel):
@@ -65,8 +64,7 @@ class ScheduledTask(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class UserStats(BaseModel):

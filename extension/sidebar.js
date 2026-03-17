@@ -52,9 +52,6 @@ async function initSidebar() {
   // Initialize chat functionality
   initChat();
 
-  // Initialize inline voice input
-  initInlineVoice();
-
   // Initialize WebSocket connection
   initWebSocket();
 }
@@ -267,6 +264,10 @@ function handleWebSocketMessage(data) {
     case 'cancelled':
       console.log('🛑 Handling cancelled');
       handleCancelled(data);
+      break;
+    case 'voice_command':
+      console.log('🎙️ Handling voice_command from website');
+      handleVoiceCommand(data);
       break;
     case 'scheduled_task_started':
       console.log('📅 Handling scheduled_task_started');
@@ -586,6 +587,10 @@ function handleTaskComplete(data) {
   // Reset automation state
   isAutomationRunning = false;
   updateStopButtonVisibility();
+
+  // Speak the completion result
+  const spokenMessage = data.final_output || data.message || 'Your task is complete.';
+  speakText(spokenMessage);
 }
 
 // Handle task error
@@ -620,6 +625,10 @@ function handleTaskError(data) {
   // Reset automation state
   isAutomationRunning = false;
   updateStopButtonVisibility();
+
+  // Speak the error message
+  const spokenMessage = data.error || 'An error occurred during the task.';
+  speakText(spokenMessage);
 }
 
 // Handle input request from server (e.g., ask for credentials)
@@ -722,6 +731,10 @@ function handleCancelled(data) {
 
   // Show toast notification
   showStatusToast('Automation cancelled', 'warning');
+
+  // Speak the actual cancellation message from the backend
+  const spokenMessage = data.message || 'The task has been cancelled.';
+  speakText(spokenMessage);
 }
 
 // Create automation container (for real-time automation steps)
@@ -1095,364 +1108,6 @@ function initChat() {
 
 }
 
-// ============================================================================
-// Voice Input - Inline (Direct Web Speech API in Sidebar)
-// ============================================================================
-
-// Persistent recognition instance — reused across clicks to avoid hardware
-// re-acquisition on every press (prevents transient not-allowed errors).
-let voiceRecognition = null;
-let isVoiceRecording = false;
-let currentVoiceTranscript = '';
-let voiceAutoSendTimer = null;
-let _permissionRequestInProgress = false; // guard against concurrent popups
-
-function initInlineVoice() {
-  const voiceBtn = document.getElementById('voiceBtn');
-  const voiceCancelBtn = document.getElementById('voiceCancelBtn');
-  const micDeniedDismiss = document.getElementById('micDeniedDismiss');
-
-  // Hide voice button if browser doesn't support Speech Recognition
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    if (voiceBtn) voiceBtn.style.display = 'none';
-    return;
-  }
-
-  if (voiceBtn) {
-    voiceBtn.addEventListener('click', toggleInlineVoice);
-  }
-
-  if (voiceCancelBtn) {
-    voiceCancelBtn.addEventListener('click', cancelInlineRecording);
-  }
-
-  // Dismiss button hides the banner (button stays blocked until permission changes)
-  if (micDeniedDismiss) {
-    micDeniedDismiss.addEventListener('click', hideMicDeniedBanner);
-  }
-
-  // Check initial permission state and attach a live change listener so the UI
-  // updates automatically if the user changes Chrome settings while open.
-  navigator.permissions.query({ name: 'microphone' }).then((permStatus) => {
-    console.log('[MIC] Initial permission state:', permStatus.state);
-    if (permStatus.state === 'denied') {
-      setMicDeniedState(true);
-    }
-    permStatus.onchange = () => {
-      console.log('[MIC] Permission state changed to:', permStatus.state);
-      if (permStatus.state === 'granted') {
-        chrome.storage.local.set({ microphonePermissionGranted: true });
-        setMicDeniedState(false);
-        showStatusToast('Microphone access restored — voice input is ready.', 'success');
-      } else if (permStatus.state === 'denied') {
-        chrome.storage.local.remove('microphonePermissionGranted');
-        setMicDeniedState(true);
-      }
-    };
-  }).catch(() => {
-    // Permissions API unavailable — silent, existing storage-flag fallback handles it
-  });
-}
-
-async function toggleInlineVoice() {
-  if (isVoiceRecording) {
-    stopInlineRecording();
-  } else {
-    await startInlineRecording();
-  }
-}
-
-// Query the real browser-level mic permission state.
-// Returns 'granted', 'prompt', or 'denied'.
-async function queryMicPermission() {
-  try {
-    const result = await navigator.permissions.query({ name: 'microphone' });
-    console.log('[MIC] Permission state:', result.state);
-    return result.state;
-  } catch (e) {
-    // Permissions API not available — fall back to storage flag
-    console.warn('[MIC] Permissions API unavailable, falling back to storage flag');
-    return null;
-  }
-}
-
-function requestMicPermissionViaPopup() {
-  if (_permissionRequestInProgress) {
-    console.log('[MIC] Popup already open, skipping duplicate request');
-    return Promise.resolve(false);
-  }
-  _permissionRequestInProgress = true;
-
-  return new Promise((resolve) => {
-    const width = 480;
-    const height = 420;
-    const left = Math.round((screen.width - width) / 2);
-    const top = Math.round((screen.height - height) / 2);
-
-    console.log('[MIC] Popup opened');
-    chrome.windows.create({
-      url: chrome.runtime.getURL('permission.html'),
-      type: 'popup',
-      width, height, left, top
-    }, (win) => {
-      const checkClosed = setInterval(() => {
-        chrome.windows.get(win.id, () => {
-          if (chrome.runtime.lastError) {
-            clearInterval(checkClosed);
-            _permissionRequestInProgress = false;
-            chrome.storage.local.get(['microphonePermissionGranted'], (result) => {
-              const granted = !!result.microphonePermissionGranted;
-              console.log('[MIC] Popup closed. granted=', granted);
-              resolve(granted);
-            });
-          }
-        });
-      }, 500);
-    });
-  });
-}
-
-// Build (or reuse) the persistent SpeechRecognition instance.
-function _ensureRecognitionInstance() {
-  if (voiceRecognition) return; // reuse existing
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  voiceRecognition = new SpeechRecognition();
-  voiceRecognition.continuous = false;
-  voiceRecognition.interimResults = true;
-  voiceRecognition.lang = 'en-US';
-  console.log('[MIC] Starting SpeechRecognition (reuse=false, new instance)');
-
-  voiceRecognition.onstart = () => {
-    console.log('[MIC] Recognition active');
-    isVoiceRecording = true;
-    setVoiceRecordingState(true);
-  };
-
-  voiceRecognition.onresult = (event) => {
-    let finalText = '';
-    let interimText = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const t = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        finalText += t + ' ';
-      } else {
-        interimText += t;
-      }
-    }
-    if (finalText) {
-      currentVoiceTranscript += finalText;
-      console.log('[MIC] Interim:', currentVoiceTranscript.length, 'chars');
-    }
-    updateVoiceLiveText(currentVoiceTranscript, interimText);
-  };
-
-  voiceRecognition.onerror = async (event) => {
-    console.log('[MIC] onerror: code=' + event.error);
-    isVoiceRecording = false;
-    setVoiceRecordingState(false);
-    hideVoiceTranscriptBar();
-
-    if (event.error === 'not-allowed') {
-      // Check REAL permission state — do not clear flag on transient errors.
-      const realState = await queryMicPermission();
-      console.log('[MIC] onerror: real-perm=' + realState);
-
-      if (realState === 'denied') {
-        // Real permanent denial — block button and show settings instructions.
-        chrome.storage.local.remove('microphonePermissionGranted');
-        voiceRecognition = null;
-        setMicDeniedState(true);
-      } else {
-        // Transient error (audio hardware busy, context switch, etc.) —
-        // do NOT clear the flag. The user did not deny anything.
-        showStatusToast('Mic busy — click the mic button to try again.', 'warning');
-        // Discard instance so a fresh one is built next click.
-        voiceRecognition = null;
-      }
-    } else if (event.error === 'audio-capture') {
-      showStatusToast('No microphone found. Please connect a microphone.', 'error');
-      voiceRecognition = null;
-    } else if (event.error === 'no-speech') {
-      showStatusToast('No speech detected. Try again.', 'warning');
-      // Don't discard instance for no-speech — just reset for next click.
-    } else {
-      showStatusToast('Voice error: ' + event.error, 'error');
-      voiceRecognition = null;
-    }
-  };
-
-  voiceRecognition.onend = () => {
-    console.log('[MIC] Final transcript: "' + currentVoiceTranscript.trim() + '"');
-    isVoiceRecording = false;
-    setVoiceRecordingState(false);
-    hideVoiceTranscriptBar();
-
-    const transcript = currentVoiceTranscript.trim();
-    if (transcript) {
-      const messageInput = document.getElementById('messageInput');
-      messageInput.value = transcript;
-      messageInput.style.height = 'auto';
-      messageInput.style.height = messageInput.scrollHeight + 'px';
-
-      showStatusToast('Voice captured — sending in 1.5s…', 'info');
-
-      voiceAutoSendTimer = setTimeout(() => {
-        const currentValue = document.getElementById('messageInput').value.trim();
-        if (currentValue && !isAutomationRunning) {
-          document.getElementById('sendBtn').click();
-        }
-      }, 1500);
-    }
-  };
-}
-
-async function startInlineRecording() {
-  console.log('[MIC] User clicked mic. isVoiceRecording=' + isVoiceRecording);
-
-  // Block if automation is already running
-  if (isAutomationRunning) {
-    showStatusToast('A task is already running. Wait for it to finish.', 'warning');
-    return;
-  }
-
-  // Clear any pending auto-send timer from a previous recording
-  if (voiceAutoSendTimer) {
-    clearTimeout(voiceAutoSendTimer);
-    voiceAutoSendTimer = null;
-  }
-
-  // ── Permission check: use real Permissions API, fall back to storage flag ──
-  const realState = await queryMicPermission();
-
-  if (realState === 'denied') {
-    // Browser has permanently denied mic — popup will always fail, don't open it.
-    console.log('[MIC] Permanently blocked — guiding user to Chrome settings');
-    setMicDeniedState(true);
-    return;
-  }
-
-  if (realState === 'granted') {
-    // Real grant confirmed — no popup needed, ensure storage flag is set.
-    await chrome.storage.local.set({ microphonePermissionGranted: true });
-  } else {
-    // 'prompt' state, or Permissions API unavailable — check storage flag.
-    const stored = await chrome.storage.local.get(['microphonePermissionGranted']);
-    if (!stored.microphonePermissionGranted) {
-      // Need to ask user via popup.
-      console.log('[MIC] Popup: opening (reason=prompt)');
-      const granted = await requestMicPermissionViaPopup();
-      if (!granted) return; // user denied or closed popup
-    }
-  }
-
-  // ── Start recognition ───────────────────────────────────────────────────────
-  currentVoiceTranscript = '';
-  _ensureRecognitionInstance();
-
-  try {
-    console.log('[MIC] Starting SpeechRecognition (reuse=' + (voiceRecognition !== null) + ')');
-    voiceRecognition.start();
-  } catch (error) {
-    console.error('❌ Failed to start voice recognition:', error);
-    // "already started" race — discard and let user retry.
-    voiceRecognition = null;
-    showStatusToast('Could not start voice input. Try again.', 'error');
-    isVoiceRecording = false;
-    setVoiceRecordingState(false);
-  }
-}
-
-function stopInlineRecording() {
-  if (voiceRecognition && isVoiceRecording) {
-    voiceRecognition.stop();
-  }
-}
-
-function cancelInlineRecording() {
-  if (voiceAutoSendTimer) {
-    clearTimeout(voiceAutoSendTimer);
-    voiceAutoSendTimer = null;
-  }
-  if (voiceRecognition) {
-    voiceRecognition.abort();
-  }
-  isVoiceRecording = false;
-  currentVoiceTranscript = '';
-  setVoiceRecordingState(false);
-  hideVoiceTranscriptBar();
-  // Clear textarea if it was populated by voice
-  const messageInput = document.getElementById('messageInput');
-  if (messageInput) {
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
-  }
-}
-
-function setVoiceRecordingState(recording) {
-  const voiceBtn = document.getElementById('voiceBtn');
-  if (!voiceBtn) return;
-  if (recording) {
-    voiceBtn.classList.add('recording');
-    voiceBtn.setAttribute('aria-label', 'Click to stop recording');
-    showVoiceTranscriptBar();
-  } else {
-    voiceBtn.classList.remove('recording');
-    voiceBtn.setAttribute('aria-label', 'Toggle voice input');
-  }
-}
-
-// ── Mic denied state helpers ─────────────────────────────────────────────────
-
-function setMicDeniedState(denied) {
-  const voiceBtn = document.getElementById('voiceBtn');
-  if (!voiceBtn) return;
-  if (denied) {
-    voiceBtn.classList.add('mic-denied');
-    voiceBtn.setAttribute('title', 'Microphone access blocked — see instructions below');
-    voiceBtn.setAttribute('aria-label', 'Microphone access blocked');
-    showMicDeniedBanner();
-  } else {
-    voiceBtn.classList.remove('mic-denied');
-    voiceBtn.setAttribute('title', 'Click to use voice input');
-    voiceBtn.setAttribute('aria-label', 'Toggle voice input');
-    hideMicDeniedBanner();
-  }
-}
-
-function showMicDeniedBanner() {
-  const banner = document.getElementById('micDeniedBanner');
-  if (banner) banner.style.display = 'flex';
-}
-
-function hideMicDeniedBanner() {
-  const banner = document.getElementById('micDeniedBanner');
-  if (banner) banner.style.display = 'none';
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-function showVoiceTranscriptBar() {
-  const bar = document.getElementById('voiceTranscriptBar');
-  if (bar) {
-    bar.style.display = 'flex';
-    updateVoiceLiveText('', '');
-  }
-}
-
-function hideVoiceTranscriptBar() {
-  const bar = document.getElementById('voiceTranscriptBar');
-  if (bar) bar.style.display = 'none';
-  const liveText = document.getElementById('voiceLiveText');
-  if (liveText) liveText.textContent = '';
-}
-
-function updateVoiceLiveText(finalText, interimText) {
-  const el = document.getElementById('voiceLiveText');
-  if (!el) return;
-  el.textContent = (finalText + interimText).trim();
-}
-
 // Add message to chat
 function addMessageToChat(role, content) {
   const chatArea = document.getElementById('chatArea');
@@ -1541,5 +1196,167 @@ function showStatusToast(message, type = 'info') {
   }, 3000);
 }
 
+// ============================================================================
+// Voice Command Handler (from Website Voice Assistant)
+// ============================================================================
+
+function handleVoiceCommand(data) {
+  const command = data.message;
+  if (!command) return;
+
+  // Display the voice command as a user message in the chat
+  addMessageToChat('user', command);
+  showTypingIndicator();
+
+  // Set automation state
+  isAutomationRunning = true;
+  updateStopButtonVisibility();
+
+  // Send the command to the server as a regular chat message
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.send(JSON.stringify({ message: command }));
+  } else {
+    showStatusToast('Not connected to server', 'error');
+    isAutomationRunning = false;
+    updateStopButtonVisibility();
+  }
+}
+
+// ============================================================================
+// Text-to-Speech Module
+// ============================================================================
+
+let currentUtterance = null;
+let isSpeaking = false;
+
+function initTTS() {
+  // Load voices
+  if (window.speechSynthesis) {
+    if (speechSynthesis.getVoices().length === 0) {
+      speechSynthesis.addEventListener('voiceschanged', () => {
+        console.log('TTS voices loaded:', speechSynthesis.getVoices().length);
+      });
+    }
+  }
+
+  // Bind speaker toggle button
+  const speakerBtn = document.getElementById('speakerToggleBtn');
+  if (speakerBtn) {
+    speakerBtn.addEventListener('click', toggleAudio);
+  }
+}
+
+function speakText(text) {
+  if (!window.speechSynthesis || !text) return;
+
+  // Cancel any current speech first
+  speechSynthesis.cancel();
+
+  // Chrome has a known bug where speak() silently fails if called
+  // immediately after cancel(). A short delay fixes this reliably.
+  setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.1;   // Slightly slower for natural cadence
+    utterance.pitch = 1.05;  // Slightly higher pitch for female voice
+    utterance.volume = 1.0;
+
+    // Select a high-quality female English voice with ranked fallback chain
+    let voices = speechSynthesis.getVoices();
+
+    // If voices aren't loaded yet, wait for them and retry
+    if (voices.length === 0) {
+      speechSynthesis.addEventListener('voiceschanged', function onVoices() {
+        speechSynthesis.removeEventListener('voiceschanged', onVoices);
+        speakText(text); // retry once voices are loaded
+      });
+      return;
+    }
+
+    // Female voice preference list — ranked from most natural to acceptable fallback
+    const femaleVoicePrefs = [
+      'Google UK English Female',          // Chrome — natural and clear
+      'Google US English',                 // Chrome — female variant
+      'Microsoft Zira',                    // Edge/Windows — high-quality female
+      'Microsoft Jenny Online (Natural)',  // Edge — neural female
+      'Microsoft Aria Online (Natural)',   // Edge — neural female
+      'Samantha',                          // macOS — default female
+      'Karen',                             // macOS — Australian female
+      'Victoria',                          // macOS — US female
+    ];
+
+    let selectedVoice = null;
+
+    // Try exact name matches first (highest quality)
+    for (const pref of femaleVoicePrefs) {
+      selectedVoice = voices.find(v => v.name.includes(pref));
+      if (selectedVoice) break;
+    }
+
+    // Fallback: any English female-sounding voice (names often contain Female/Woman)
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v =>
+        v.lang.startsWith('en') && /female|woman|zira|jenny|aria|samantha|karen/i.test(v.name)
+      );
+    }
+
+    // Last resort: any English voice
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v => v.lang.startsWith('en'));
+    }
+
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+
+    utterance.onstart = () => {
+      isSpeaking = true;
+      updateSpeakerIcon();
+    };
+
+    utterance.onend = () => {
+      isSpeaking = false;
+      updateSpeakerIcon();
+    };
+
+    utterance.onerror = (e) => {
+      console.error('TTS error:', e.error);
+      isSpeaking = false;
+      updateSpeakerIcon();
+    };
+
+    currentUtterance = utterance;
+    speechSynthesis.speak(utterance);
+  }, 150); // 150ms delay after cancel() to avoid Chrome bug
+}
+
+function stopSpeaking() {
+  if (window.speechSynthesis) {
+    speechSynthesis.cancel();
+  }
+  isSpeaking = false;
+  updateSpeakerIcon();
+}
+
+function toggleAudio() {
+  // Clicking the speaker while audio is playing stops it and hides the icon
+  stopSpeaking();
+}
+
+function updateSpeakerIcon() {
+  const btn = document.getElementById('speakerToggleBtn');
+  if (!btn) return;
+
+  if (isSpeaking) {
+    // Show the speaker icon only while audio is playing
+    btn.style.display = 'flex';
+    btn.classList.add('speaking');
+  } else {
+    // Hide the speaker icon when audio is not playing
+    btn.style.display = 'none';
+    btn.classList.remove('speaking');
+  }
+}
+
 // Initialize on page load
+initTTS();
 initSidebar();

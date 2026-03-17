@@ -65,7 +65,7 @@ Do not delete or reply to the email.
 
 Go to Amazon.com.
 
-product is laptop
+If a product name or link is not provided, ask me for it.
 
 Search for the product and identify the  **lowest-priced listing** .
 

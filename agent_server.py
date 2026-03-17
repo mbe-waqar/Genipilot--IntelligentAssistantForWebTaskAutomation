@@ -51,8 +51,8 @@ async def get_user_settings(user_email: str) -> dict:
     Returns defaults if settings are not found.
     """
     defaults = {
-        "email_notifications": True,
-        "task_notifications": True,
+        "email_notifications": False,
+        "task_notifications": False,
         "error_alerts": False
     }
     try:
@@ -61,8 +61,8 @@ async def get_user_settings(user_email: str) -> dict:
         if user_doc and "settings" in user_doc:
             settings = user_doc["settings"]
             return {
-                "email_notifications": settings.get("email_notifications", True),
-                "task_notifications": settings.get("task_notifications", True),
+                "email_notifications": settings.get("email_notifications", False),
+                "task_notifications": settings.get("task_notifications", False),
                 "error_alerts": settings.get("error_alerts", False)
             }
         return defaults
@@ -375,6 +375,7 @@ def _make_browser() -> Browser:
         headless=False,
         keep_alive=True,
         disable_security=False,
+        permissions=['clipboardReadWrite', 'notifications', 'audioCapture'],
     )
 
 browser = _make_browser()
@@ -599,15 +600,6 @@ running_tasks = {}
 # Used to call agent.stop() for real mid-execution cancellation
 running_agents = {}
 
-# Pre-created task history IDs per user command (one per WebSocket message).
-# Ensures one user message = one DB record, regardless of how many times
-# the orchestrator internally calls the Automation tool.
-command_history_ids: dict = {}
-
-# Tracks whether the Automation tool was actually invoked for the current command.
-# Used to finalize pre-created records for pure-chat responses (no automation).
-automation_executed_for_command: dict = {}
-
 
 # Request body model
 class ChatRequest(BaseModel):
@@ -657,6 +649,12 @@ _EXTENSION_URL_SCHEMES = (
     "chrome-devtools://",
 )
 
+# URLs that belong to our own dashboard — never automate these tabs.
+_DASHBOARD_URL_PREFIXES = (
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+)
+
 # Safety rule prepended to every automation task (Layer 3 — prompt-level guard).
 _TAB_SAFETY_RULE = (
     "[SYSTEM RULE] You must ONLY operate inside real browser tabs. "
@@ -664,6 +662,24 @@ _TAB_SAFETY_RULE = (
     "open a new tab (navigate to about:blank, then to your destination) and "
     "continue the task there. Never interact with or automate any page whose "
     "URL starts with 'chrome-extension://'.\n\n"
+)
+
+# HITL safety rule — forces the agent to ask the human for sensitive information
+# instead of guessing or inserting placeholder values.
+_HITL_SAFETY_RULE = (
+    "[CRITICAL RULE — HUMAN INPUT REQUIRED] "
+    "You must NEVER guess, fabricate, or auto-fill sensitive information. "
+    "This includes: email addresses, usernames, passwords, phone numbers, "
+    "OTP codes, verification codes, 2FA codes, credit card numbers, "
+    "addresses, security answers, or any personal credentials.\n"
+    "When you encounter a form field that requires ANY of the above:\n"
+    "1. STOP immediately — do NOT type anything into the field.\n"
+    "2. Use the 'ask_human' tool to ask the user for the required information.\n"
+    "3. WAIT for the human to respond before continuing.\n"
+    "4. Only after receiving the actual value from the human, type it into the field.\n"
+    "You must NEVER insert placeholder text like 'email@example.com', 'password123', "
+    "'test@test.com', 'user@email.com', or any made-up value.\n"
+    "If you are unsure whether a field requires sensitive data, use 'ask_human' to ask.\n\n"
 )
 
 # Common website keywords → expected domain fragment for tab matching.
@@ -717,6 +733,10 @@ async def _get_valid_browser_tabs() -> list:
             and not any(
                 t.get("url", "").startswith(scheme)
                 for scheme in _EXTENSION_URL_SCHEMES
+            )
+            and not any(
+                t.get("url", "").startswith(prefix)
+                for prefix in _DASHBOARD_URL_PREFIXES
             )
         ]
     except Exception as e:
@@ -852,31 +872,23 @@ async def execute_automation_task(task: str, user_email: str = None) -> str:
     history_id = None
 
     try:
-        # One user message = one task record.
-        # If websocket_chat() pre-created a record for this command, reuse it.
-        # Otherwise (scheduler / direct-call path), create a new record.
-        pre_created_id = command_history_ids.get(actual_user_email)
-        if pre_created_id:
-            history_id = pre_created_id
-            automation_executed_for_command[actual_user_email] = True
-            print(f"✅ Using pre-created task record: {history_id}")
-        else:
-            automation_record = AutomationHistory(
-                user_email=actual_user_email,
-                task_name=task[:100],
-                task_description=task,
-                status=TaskStatus.RUNNING,
-                start_time=start_time
-            )
-            history_id = await AutomationHistoryDB.create(automation_record)
-            print(f"✅ Created automation history record: {history_id}")
+        # Create automation history record in database
+        automation_record = AutomationHistory(
+            user_email=actual_user_email,
+            task_name=task[:100],  # Truncate task name
+            task_description=task,
+            status=TaskStatus.RUNNING,
+            start_time=start_time
+        )
+        history_id = await AutomationHistoryDB.create(automation_record)
+        print(f"✅ Created automation history record: {history_id}")
 
         # Track this running task for the user
         if actual_user_email:
             running_tasks[actual_user_email] = history_id
 
     except Exception as e:
-        print(f"⚠️ Could not set up automation history record: {e}")
+        print(f"⚠️ Could not create automation history record: {e}")
 
     # Modify task if it contains "wait for instructions" to avoid agent getting stuck
     processed_task = task
@@ -914,9 +926,10 @@ async def execute_automation_task(task: str, user_email: str = None) -> str:
     else:
         print("⚠️ [TabSelect] Tab selection failed — browser-use will use its default.")
 
-    # ── LAYER 3: Prepend safety rule to the task prompt ──────────────────────
-    # This instructs the LLM to self-correct if it ever lands on an extension page.
-    processed_task = _TAB_SAFETY_RULE + processed_task
+    # ── LAYER 3: Prepend safety rules to the task prompt ─────────────────────
+    # Tab safety: self-correct if the agent lands on an extension page.
+    # HITL safety: never guess credentials, always ask the human.
+    processed_task = _TAB_SAFETY_RULE + _HITL_SAFETY_RULE + processed_task
 
     # Create agent directly (user's working pattern - NO use_own_browser_context)
     agent = BrowserAgent(
@@ -959,6 +972,34 @@ async def execute_automation_task(task: str, user_email: str = None) -> str:
     # Inject custom logo script AFTER agent is created
     # This ensures the browser context is available
     await inject_logo_script_on_all_pages(browser)
+
+    # ── LAYER 4: Post-creation page URL check ─────────────────────────────────
+    # Verify the agent isn't attached to an extension page after creation.
+    # If it is, navigate to about:blank to escape before running the task.
+    try:
+        valid_tabs = await _get_valid_browser_tabs()
+        if valid_tabs:
+            # Check if the current/active page is an extension page via CDP
+            async with aiohttp.ClientSession() as _http:
+                async with _http.get(
+                    "http://localhost:9222/json",
+                    timeout=aiohttp.ClientTimeout(total=3)
+                ) as _resp:
+                    if _resp.status == 200:
+                        all_targets = await _resp.json()
+                        # Find the first page-type target that is an extension page
+                        for target in all_targets:
+                            if (target.get("type") == "page"
+                                    and any(target.get("url", "").startswith(s) for s in _EXTENSION_URL_SCHEMES)):
+                                # If this extension page was the last focused, force switch
+                                if not chosen_target_id:
+                                    new_tab = await _create_new_browser_tab()
+                                    if new_tab:
+                                        await asyncio.sleep(0.5)
+                                        print("✅ [TabSelect] Post-check: escaped extension page → new tab")
+                                break
+    except Exception as _pc_err:
+        print(f"⚠️ [TabSelect] Post-creation check (non-critical): {_pc_err}")
 
     # Get the WebSocket connection for real-time updates
     websocket = active_websockets.get(_current_automation_user)
@@ -1049,10 +1090,10 @@ async def execute_automation_task(task: str, user_email: str = None) -> str:
                 db = get_database()
                 await db["automation_history"].update_one(
                     {"_id": ObjectId(history_id)},
-                    {
-                        "$inc": {"steps_count": history.number_of_steps() if history else 0},
-                        "$addToSet": {"urls_visited": {"$each": urls[:20] if urls else []}}
-                    }
+                    {"$set": {
+                        "steps_count": history.number_of_steps() if history else 0,
+                        "urls_visited": urls[:20] if urls else []  # Limit to 20 URLs
+                    }}
                 )
 
                 print(f"✅ Updated automation history record: {history_id}")
@@ -1167,11 +1208,6 @@ When a user asks you to do something that requires browser automation:
 3. After receiving results from the Automation tool, provide a clear summary to the user
 4. If there are errors, explain them clearly
 
-CRITICAL RULE — One Task Per Message:
-You MUST call the Automation tool EXACTLY ONCE per user message, even if the message contains multiple actions or websites (e.g., "open youtube and play a song", "open google then search for AI", "open youtube and open facebook", "open google, search AI, download PDF").
-Pass the COMPLETE, unmodified user command as a single string to the Automation tool.
-The Automation tool handles all internal steps — do NOT split a single user message into multiple Automation tool calls.
-
 You have access to browser automation that can:
 - Navigate to websites
 - Click buttons and links
@@ -1258,6 +1294,16 @@ async def websocket_chat(websocket: WebSocket, user_email: str):
     """
     await websocket.accept()
 
+    # Close stale WebSocket for this user if one exists (prevents collision
+    # between sidebar and offscreen connections competing for the same slot).
+    old_ws = active_websockets.get(user_email)
+    if old_ws and old_ws != websocket:
+        try:
+            await old_ws.close()
+            print(f"🔄 Closed stale WebSocket for {user_email}")
+        except Exception:
+            pass  # Already closed
+
     # Register this WebSocket for user input requests
     active_websockets[user_email] = websocket
 
@@ -1332,25 +1378,7 @@ async def websocket_chat(websocket: WebSocket, user_email: str):
             }):
                 break  # Client disconnected
 
-            cmd_start_time = datetime.now()
             try:
-                # Pre-create ONE task record for this user command.
-                # One user message = one DB record, regardless of how many
-                # Automation tool calls the orchestrator makes internally.
-                try:
-                    cmd_record = AutomationHistory(
-                        user_email=user_email,
-                        task_name=user_message[:100],
-                        task_description=user_message,
-                        status=TaskStatus.RUNNING,
-                        start_time=cmd_start_time
-                    )
-                    cmd_history_id = await AutomationHistoryDB.create(cmd_record)
-                    command_history_ids[user_email] = cmd_history_id
-                    print(f"✅ Pre-created task record for command: {cmd_history_id}")
-                except Exception as pre_err:
-                    print(f"⚠️ Could not pre-create task record: {pre_err}")
-
                 # Stream the agent execution
                 step_number = 0
                 current_tool_name = None
@@ -1475,24 +1503,7 @@ async def websocket_chat(websocket: WebSocket, user_email: str):
                 cancel_listener_active = False
                 cancel_task.cancel()
 
-                # Finalize the pre-created task record.
-                # If Automation was never invoked (pure chat response), update the
-                # record to SUCCESS now. If Automation ran, it already updated it.
-                cmd_id = command_history_ids.pop(user_email, None)
-                was_executed = automation_executed_for_command.pop(user_email, False)
-                if cmd_id and not was_executed:
-                    try:
-                        await AutomationHistoryDB.update_status(
-                            history_id=cmd_id,
-                            status=TaskStatus.SUCCESS,
-                            end_time=datetime.now(),
-                            duration_seconds=(datetime.now() - cmd_start_time).total_seconds(),
-                            final_result=final_output or message_buffer or "Chat response"
-                        )
-                    except Exception:
-                        pass
-
-                # Send completion message (only if still connected and not cancelled)
+                # Send completion or cancellation message with the final output
                 if not cancellation_flags.get(user_email):
                     await safe_send_json(websocket, {
                         "type": "complete",
@@ -1514,16 +1525,20 @@ async def websocket_chat(websocket: WebSocket, user_email: str):
                             })
                     except Exception:
                         pass  # Don't break flow for notification settings
+                else:
+                    # Task was cancelled — send the final output so the extension
+                    # can display it and trigger TTS with the actual agent message
+                    cancelled_output = final_output or message_buffer
+                    await safe_send_json(websocket, {
+                        "type": "cancelled",
+                        "timestamp": datetime.now().isoformat(),
+                        "message": cancelled_output or "Task was cancelled."
+                    })
 
             except Exception as e:
                 # Stop the cancel listener on error too
                 cancel_listener_active = False
                 cancel_task.cancel()
-
-                # Clean up command context on error
-                command_history_ids.pop(user_email, None)
-                automation_executed_for_command.pop(user_email, None)
-
                 import traceback
                 traceback.print_exc()
 
@@ -1605,9 +1620,36 @@ async def websocket_dashboard(websocket: WebSocket, user_email: str):
 
     try:
         while True:
-            # Keep connection alive - just listen for pings/client messages
             data = await websocket.receive_text()
-            # Dashboard doesn't send meaningful messages, just keeps alive
+            try:
+                msg = json.loads(data)
+                msg_type = msg.get("type", "")
+
+                if msg_type == "voice_command":
+                    command = msg.get("command", "")
+                    if command:
+                        # Forward to the chat WebSocket for this user
+                        chat_ws = active_websockets.get(user_email)
+                        if chat_ws:
+                            await safe_send_json(chat_ws, {
+                                "type": "voice_command",
+                                "message": command,
+                                "source": "website_voice_assistant",
+                                "timestamp": datetime.now().isoformat()
+                            })
+                            await safe_send_json(websocket, {
+                                "type": "voice_command_status",
+                                "status": "sent",
+                                "message": "Command sent to extension"
+                            })
+                        else:
+                            await safe_send_json(websocket, {
+                                "type": "voice_command_status",
+                                "status": "error",
+                                "message": "Extension not connected. Please open the Chrome extension."
+                            })
+            except json.JSONDecodeError:
+                pass
     except WebSocketDisconnect:
         print(f"📡 Dashboard WebSocket disconnected for: {user_email}")
     except Exception as e:
@@ -1887,6 +1929,42 @@ async def reload_scheduler_task(request: Request):
             status_code=500,
             content={"success": False, "error": str(e)}
         )
+
+
+@app.post("/api/voice-command")
+async def handle_voice_command(request: Request):
+    """Handle voice command from website dashboard - runs as automation task"""
+    try:
+        body = await request.json()
+        user_email = body.get("user_email", "")
+        command_text = body.get("command", "")
+
+        if not user_email or not command_text:
+            return JSONResponse(status_code=400, content={"error": "Missing user_email or command"})
+
+        # Check if user already has a running task
+        if user_email in running_tasks:
+            return JSONResponse(status_code=409, content={"error": "A task is already running"})
+
+        # Send the command to the extension via the chat WebSocket
+        ws = active_websockets.get(user_email)
+        if not ws:
+            return JSONResponse(status_code=503, content={"error": "Extension not connected"})
+
+        # Send as a regular chat message through the WebSocket
+        # The extension's WebSocket handler will process it
+        await safe_send_json(ws, {
+            "type": "voice_command",
+            "message": command_text,
+            "source": "website_voice_assistant",
+            "timestamp": datetime.now().isoformat()
+        })
+
+        return JSONResponse(content={"success": True, "message": "Voice command sent to extension"})
+
+    except Exception as e:
+        print(f"Error handling voice command: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 async def cleanup_orphaned_tasks():

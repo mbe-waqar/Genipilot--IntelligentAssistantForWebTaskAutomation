@@ -111,6 +111,7 @@ async function fetchScheduledTasks() {
         if (result.success) {
             allScheduledTasks = result.data;
             updateScheduledTasksList(allScheduledTasks);
+            updateScheduledStatCard();
         }
     } catch (error) {
         console.error('Error fetching scheduled tasks:', error);
@@ -123,40 +124,63 @@ async function fetchScheduledTasks() {
 
 function updateStatsCards(stats) {
     // Total Tasks
-    const totalTasksEl = document.querySelector('.stat-card.blue .value');
+    const totalTasksEl = document.getElementById('statTotalTasks');
     if (totalTasksEl) {
-        totalTasksEl.textContent = stats.total_tasks || 0;
+        animateCounter(totalTasksEl, stats.total_tasks || 0);
     }
 
     // Success Rate
-    const successRateEl = document.querySelector('.stat-card.green .value');
+    const successRateEl = document.getElementById('statSuccessRate');
     if (successRateEl) {
-        successRateEl.textContent = `${stats.success_rate || 0}%`;
+        animateCounter(successRateEl, stats.success_rate || 0, '%');
     }
 
-    // Last Task Executed
-    const lastTaskEl = document.querySelector('.stat-card.orange .value');
-    const lastTaskLabelEl = document.querySelector('.stat-card.orange .label');
+    // Scheduled Tasks count
+    updateScheduledStatCard();
+}
 
-    if (lastTaskEl && stats.last_task_date) {
-        const date = new Date(stats.last_task_date);
-        lastTaskEl.textContent = date.toLocaleDateString();
-        lastTaskEl.style.fontSize = '1.2rem';
+function updateScheduledStatCard() {
+    const countEl = document.getElementById('statScheduledCount');
+    const labelEl = document.getElementById('statNextRun');
+    if (!countEl) return;
 
-        if (lastTaskLabelEl) {
-            lastTaskLabelEl.textContent = date.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-    } else if (lastTaskEl) {
-        lastTaskEl.textContent = 'No tasks yet';
-        lastTaskEl.style.fontSize = '1.2rem';
+    const activeCount = allScheduledTasks ? allScheduledTasks.filter(t => t.is_active).length : 0;
+    animateCounter(countEl, activeCount);
 
-        if (lastTaskLabelEl) {
-            lastTaskLabelEl.textContent = '';
+    if (labelEl) {
+        // Find the next upcoming run
+        const now = new Date();
+        let nearest = null;
+        (allScheduledTasks || []).forEach(t => {
+            if (t.is_active && t.next_run) {
+                const nr = new Date(t.next_run);
+                if (nr > now && (!nearest || nr < nearest)) nearest = nr;
+            }
+        });
+        if (nearest) {
+            const diff = nearest - now;
+            const mins = Math.floor(diff / 60000);
+            const hrs = Math.floor(mins / 60);
+            labelEl.textContent = hrs > 0 ? `Next run in ${hrs}h ${mins % 60}m` : `Next run in ${mins}m`;
+        } else {
+            labelEl.textContent = activeCount > 0 ? 'Active schedules' : 'No active schedules';
         }
     }
+}
+
+function animateCounter(el, target, suffix = '') {
+    const duration = 600;
+    const start = parseInt(el.textContent) || 0;
+    if (start === target) { el.textContent = target + suffix; return; }
+    const startTime = performance.now();
+    function step(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(start + (target - start) * eased);
+        el.textContent = current + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
 }
 
 function updateHistoryTable(history) {
@@ -261,8 +285,8 @@ function buildScheduledTaskCard(task, compact) {
     const isActive = task.is_active;
 
     // Border color based on state
-    let borderColor = isRunning ? '#3498db' : isActive ? '#28a745' : '#6c757d';
-    let bgTint = isRunning ? 'rgba(52,152,219,0.04)' : isActive ? 'rgba(40,167,69,0.02)' : 'rgba(108,117,125,0.03)';
+    let borderColor = isRunning ? '#016B61' : isActive ? '#059669' : '#718096';
+    let bgTint = isRunning ? 'rgba(1,107,97,0.04)' : isActive ? 'rgba(5,150,105,0.03)' : 'rgba(113,128,150,0.03)';
     let pulseClass = isRunning ? 'scheduled-task-running' : '';
 
     // Time remaining / last run info
@@ -272,9 +296,9 @@ function buildScheduledTaskCard(task, compact) {
         const timeDiff = nextRunDate - new Date();
         if (timeDiff > 0) {
             timeHtml = `
-                <div class="mt-2 px-2 py-1" style="background:#f0f8ff; border-left:3px solid #3498db; border-radius:4px; font-size:0.8rem;">
-                    <i class="bi bi-clock text-primary"></i> <strong>Next:</strong> ${nextRunDate.toLocaleString()}
-                    &nbsp;<span class="countdown" data-next-run="${task.next_run}" style="color:#3498db; font-weight:600;">${formatTimeRemaining(timeDiff)}</span>
+                <div class="mt-2 px-2 py-1" style="background:#F0F7F6; border-left:3px solid #016B61; border-radius:4px; font-size:0.8rem;">
+                    <i class="bi bi-clock" style="color:#016B61;"></i> <strong>Next:</strong> ${nextRunDate.toLocaleString()}
+                    &nbsp;<span class="countdown" data-next-run="${task.next_run}" style="color:#016B61; font-weight:600;">${formatTimeRemaining(timeDiff)}</span>
                 </div>`;
         } else {
             timeHtml = `<small class="text-muted d-block mt-1"><i class="bi bi-clock-history"></i> Running soon...</small>`;
@@ -294,12 +318,13 @@ function buildScheduledTaskCard(task, compact) {
     // Delete overlay (top-right)
     const deleteOverlay = `
         <span onclick="event.stopPropagation(); deleteScheduledTask('${task._id}')" title="Delete" style="
-            position:absolute; top:6px; right:6px; width:24px; height:24px;
-            background:rgba(220,53,69,0.1); border-radius:50%; cursor:pointer;
-            font-size:12px; line-height:24px; text-align:center; color:#dc3545;
-            transition: background 0.2s, transform 0.2s; z-index:2;
-        " onmouseover="this.style.background='rgba(220,53,69,0.85)'; this.style.color='#fff'; this.style.transform='scale(1.15)'"
-           onmouseout="this.style.background='rgba(220,53,69,0.1)'; this.style.color='#dc3545'; this.style.transform='scale(1)'">
+            position:absolute; top:6px; right:6px; width:26px; height:26px;
+            background:linear-gradient(135deg,#0a2a25,#016B61); border-radius:7px; cursor:pointer;
+            font-size:12px; line-height:26px; text-align:center; color:#fff;
+            box-shadow:0 2px 6px rgba(1,107,97,0.2);
+            transition: all 0.25s ease; z-index:2;
+        " onmouseover="this.style.background='linear-gradient(135deg,#b91c1c,#e53935)'; this.style.boxShadow='0 3px 10px rgba(229,57,53,0.3)'; this.style.transform='scale(1.12)'"
+           onmouseout="this.style.background='linear-gradient(135deg,#0a2a25,#016B61)'; this.style.boxShadow='0 2px 6px rgba(1,107,97,0.2)'; this.style.transform='scale(1)'">
             <i class="bi bi-x-lg" style="font-size:11px;"></i>
         </span>`;
 
@@ -1384,7 +1409,7 @@ async function eraseHistory() {
 
     if (!confirm('Are you sure you want to erase ALL automation history? This cannot be undone.')) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-trash"></i> Erase History';
+        btn.innerHTML = '<i class="bi bi-trash3"></i> Erase History';
         return;
     }
 
@@ -1409,7 +1434,7 @@ async function eraseHistory() {
         showToast(`Error: ${error.message}`, 'danger');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-trash"></i> Erase History';
+        btn.innerHTML = '<i class="bi bi-trash3"></i> Erase History';
     }
 }
 
@@ -1555,6 +1580,12 @@ function handleDashboardNotification(data) {
         fetchScheduledTasks();
         fetchAutomationHistory();
         fetchDashboardStats();
+
+    } else if (data.type === 'voice_command_status') {
+        // Handle voice command delivery status from agent server
+        if (typeof handleVoiceCommandStatus === 'function') {
+            handleVoiceCommandStatus(data);
+        }
     }
 }
 
@@ -1630,6 +1661,9 @@ async function initializeDashboard() {
     // Connect WebSocket for real-time notifications (after profile is loaded)
     connectDashboardWebSocket();
 
+    // Initialize Voice Assistant module
+    initVoiceAssistant();
+
     // Set up auto-refresh every 15 seconds (check agent health more frequently)
     setInterval(async () => {
         await Promise.all([
@@ -1646,4 +1680,621 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeDashboard);
 } else {
     initializeDashboard();
+}
+
+
+// ============================================================================
+// Voice Assistant Module — "Hey Geni"
+// ============================================================================
+
+// Voice Assistant States
+const VA_STATE = {
+    DISABLED: 'disabled',
+    STANDBY: 'standby',
+    ACTIVATED: 'activated',
+    PROCESSING: 'processing',
+    CONFIRMATION: 'confirmation'
+};
+
+let vaState = VA_STATE.DISABLED;
+let vaRecognition = null;          // SpeechRecognition for wake word
+let vaCommandRecognition = null;   // SpeechRecognition for command capture
+let vaCommandText = '';
+let vaCommandHistory = [];
+let vaWakeDebounce = false;        // Debounce wake word triggers
+let vaRestartTimer = null;         // Auto-restart timer for wake word listener
+let vaIsRecognitionActive = false; // Track if recognition is currently running
+let vaRetryCount = 0;              // Track retries for backoff
+const VA_MAX_RETRIES = 5;         // Max consecutive retries before pausing
+
+// Wake word variations for fuzzy matching
+const WAKE_PATTERNS = [
+    'hey geni', 'hey jenny', 'hey genie', 'hey jeanie', 'hey jeni',
+    'hey ginny', 'hey genny', 'a geni', 'hey genius', 'hey gene',
+    'he geni', 'hey g', 'hey jenni', 'hey jeannie'
+];
+
+function initVoiceAssistant() {
+    const toggle = document.getElementById('voiceAssistantToggle');
+    if (!toggle) return;
+
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        const unsupported = document.getElementById('voiceUnsupported');
+        if (unsupported) unsupported.classList.remove('d-none');
+        toggle.disabled = true;
+        return;
+    }
+
+    toggle.addEventListener('change', () => {
+        if (toggle.checked) {
+            toggle.nextElementSibling.textContent = 'ON';
+            localStorage.setItem('voiceAssistantEnabled', 'true');
+            startVoiceAssistant();
+        } else {
+            toggle.nextElementSibling.textContent = 'OFF';
+            localStorage.setItem('voiceAssistantEnabled', 'false');
+            stopVoiceAssistant();
+        }
+    });
+
+    // Restore toggle state from localStorage
+    const saved = localStorage.getItem('voiceAssistantEnabled');
+    if (saved === 'true') {
+        toggle.checked = true;
+        toggle.nextElementSibling.textContent = 'ON';
+        startVoiceAssistant();
+    }
+
+    // Handle page visibility — pause/resume when tab is hidden/shown
+    document.addEventListener('visibilitychange', () => {
+        if (vaState === VA_STATE.DISABLED) return;
+        if (document.hidden) {
+            pauseWakeWordListener();
+        } else if (vaState === VA_STATE.STANDBY) {
+            startWakeWordListener();
+        }
+    });
+}
+
+async function startVoiceAssistant() {
+    const card = document.getElementById('voiceAssistantCard');
+    if (card) card.classList.remove('disabled-look');
+
+    // Pre-check mic permission before starting
+    const hasMic = await checkMicPermission();
+    if (!hasMic) {
+        showMicDeniedError();
+        return;
+    }
+
+    hideMicDeniedError();
+    vaRetryCount = 0;
+    setVoiceState(VA_STATE.STANDBY);
+
+    // Small delay after getUserMedia releases the mic
+    setTimeout(() => startWakeWordListener(), 300);
+}
+
+function stopVoiceAssistant() {
+    // Set state FIRST so onend handlers don't restart
+    vaState = VA_STATE.DISABLED;
+
+    pauseWakeWordListener();
+    stopCommandCapture();
+
+    const card = document.getElementById('voiceAssistantCard');
+    if (card) card.classList.add('disabled-look');
+
+    setVoiceState(VA_STATE.DISABLED);
+
+    // Hide transcript and feedback
+    hideElement('voiceTranscriptDisplay');
+    hideElement('voiceFeedback');
+
+    // Clear flags
+    vaWakeDebounce = false;
+    vaIsRecognitionActive = false;
+    vaRetryCount = 0;
+}
+
+// --- Mic Permission Check ---
+
+async function checkMicPermission() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop()); // Release immediately
+        return true;
+    } catch (err) {
+        console.warn('[VA] getUserMedia check failed:', err.name, err.message);
+        return false;
+    }
+}
+
+function showMicDeniedError() {
+    const micError = document.getElementById('voiceMicError');
+    if (micError) micError.classList.remove('d-none');
+    stopVoiceAssistant();
+    const toggle = document.getElementById('voiceAssistantToggle');
+    if (toggle) {
+        toggle.checked = false;
+        toggle.nextElementSibling.textContent = 'OFF';
+    }
+    localStorage.setItem('voiceAssistantEnabled', 'false');
+}
+
+function hideMicDeniedError() {
+    const micError = document.getElementById('voiceMicError');
+    if (micError) micError.classList.add('d-none');
+}
+
+// --- Wake Word Listener ---
+
+function startWakeWordListener() {
+    // Clean up any existing instance
+    if (vaRecognition) {
+        try { vaRecognition.abort(); } catch(e) {}
+        vaRecognition = null;
+    }
+    vaIsRecognitionActive = false;
+    if (vaRestartTimer) {
+        clearTimeout(vaRestartTimer);
+        vaRestartTimer = null;
+    }
+
+    // Don't start if not in standby
+    if (vaState !== VA_STATE.STANDBY) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    vaRecognition = new SpeechRecognition();
+    vaRecognition.continuous = true;
+    vaRecognition.interimResults = true;
+    vaRecognition.lang = 'en-US';
+    vaRecognition.maxAlternatives = 3;
+
+    vaRecognition.onstart = () => {
+        vaIsRecognitionActive = true;
+        vaRetryCount = 0; // Reset retries on successful start
+        hideMicDeniedError(); // Clear any stale error
+        console.log('[VA] Wake word listener active — mic is live');
+    };
+
+    vaRecognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            // Check all alternatives for better matching
+            for (let alt = 0; alt < event.results[i].length; alt++) {
+                const transcript = event.results[i][alt].transcript.toLowerCase().trim();
+                console.log('[VA] Heard:', transcript);
+                if (matchesWakeWord(transcript)) {
+                    if (!vaWakeDebounce) {
+                        vaWakeDebounce = true;
+                        setTimeout(() => { vaWakeDebounce = false; }, 3000);
+                        onWakeWordDetected();
+                    }
+                    return;
+                }
+            }
+        }
+    };
+
+    vaRecognition.onerror = (event) => {
+        console.log('[VA] Wake listener error:', event.error);
+
+        switch (event.error) {
+            case 'not-allowed':
+            case 'service-not-allowed':
+                // Don't trust this blindly — verify with getUserMedia
+                checkMicPermission().then(hasAccess => {
+                    if (!hasAccess) {
+                        // Mic is actually denied
+                        console.error('[VA] Mic permission truly denied');
+                        showMicDeniedError();
+                    } else {
+                        // False alarm (CDP interference, tab switch, etc.) — retry
+                        console.warn('[VA] Got not-allowed but mic is accessible — retrying');
+                        scheduleWakeRestart(500);
+                    }
+                });
+                break;
+
+            case 'no-speech':
+                // Normal — silence timeout, just let onend restart
+                console.log('[VA] No speech detected — will auto-restart');
+                break;
+
+            case 'aborted':
+                // We called .abort() or browser interrupted — let onend handle
+                console.log('[VA] Recognition aborted');
+                break;
+
+            case 'audio-capture':
+                // Mic is in use by another app
+                console.warn('[VA] Mic in use by another app — retrying in 2s');
+                scheduleWakeRestart(2000);
+                break;
+
+            case 'network':
+                console.warn('[VA] Network error — retrying in 1s');
+                scheduleWakeRestart(1000);
+                break;
+
+            default:
+                console.warn('[VA] Unknown error:', event.error, '— retrying');
+                scheduleWakeRestart(1000);
+                break;
+        }
+    };
+
+    vaRecognition.onend = () => {
+        vaIsRecognitionActive = false;
+        console.log('[VA] Wake listener ended, state:', vaState);
+        // Auto-restart if we should still be listening
+        if (vaState === VA_STATE.STANDBY && !document.hidden) {
+            scheduleWakeRestart(300);
+        }
+    };
+
+    try {
+        vaRecognition.start();
+        console.log('[VA] Wake word listener started');
+    } catch(e) {
+        vaIsRecognitionActive = false;
+        console.warn('[VA] Could not start wake listener:', e.message);
+        scheduleWakeRestart(1000);
+    }
+}
+
+function scheduleWakeRestart(delay) {
+    if (vaRestartTimer) clearTimeout(vaRestartTimer);
+    if (vaState !== VA_STATE.STANDBY || document.hidden) return;
+
+    vaRetryCount++;
+    if (vaRetryCount > VA_MAX_RETRIES) {
+        // Back off — wait longer, then reset count
+        console.warn(`[VA] ${VA_MAX_RETRIES} consecutive retries, backing off 5s...`);
+        vaRetryCount = 0;
+        delay = 5000;
+    }
+
+    vaRestartTimer = setTimeout(() => {
+        if (vaState === VA_STATE.STANDBY && !document.hidden) {
+            console.log('[VA] Scheduled restart, attempt', vaRetryCount);
+            startWakeWordListener();
+        }
+    }, delay);
+}
+
+function pauseWakeWordListener() {
+    if (vaRestartTimer) {
+        clearTimeout(vaRestartTimer);
+        vaRestartTimer = null;
+    }
+    if (vaRecognition) {
+        try { vaRecognition.abort(); } catch(e) {}
+        vaRecognition = null;
+    }
+    vaIsRecognitionActive = false;
+}
+
+function matchesWakeWord(transcript) {
+    const cleaned = transcript.replace(/[^a-z\s]/g, '').trim();
+    for (const pattern of WAKE_PATTERNS) {
+        if (cleaned.includes(pattern)) return true;
+    }
+    // Additional fuzzy: check if last few words match
+    const words = cleaned.split(/\s+/);
+    const tail = words.slice(-3).join(' ');
+    for (const pattern of WAKE_PATTERNS) {
+        if (tail.includes(pattern)) return true;
+    }
+    return false;
+}
+
+// --- Wake Word Detected ---
+
+function onWakeWordDetected() {
+    console.log('[VA] Wake word detected!');
+    pauseWakeWordListener();
+    playActivationSound();
+    setVoiceState(VA_STATE.ACTIVATED);
+
+    // Hide old feedback
+    hideElement('voiceFeedback');
+
+    // Start command capture
+    startCommandCapture();
+}
+
+function playActivationSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.25);
+    } catch(e) {
+        // Audio context not available, skip sound
+    }
+}
+
+// --- Command Capture ---
+
+function startCommandCapture() {
+    vaCommandText = '';
+    const transcriptDisplay = document.getElementById('voiceTranscriptDisplay');
+    const transcriptText = document.getElementById('voiceTranscriptText');
+    if (transcriptDisplay) transcriptDisplay.style.display = 'block';
+    if (transcriptText) transcriptText.textContent = 'Listening...';
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    vaCommandRecognition = new SpeechRecognition();
+    vaCommandRecognition.continuous = false;
+    vaCommandRecognition.interimResults = true;
+    vaCommandRecognition.lang = 'en-US';
+
+    let silenceTimer = null;
+
+    vaCommandRecognition.onresult = (event) => {
+        let finalText = '';
+        let interimText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const t = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalText += t + ' ';
+            } else {
+                interimText += t;
+            }
+        }
+        if (finalText) vaCommandText += finalText;
+
+        // Update live transcript
+        if (transcriptText) {
+            transcriptText.textContent = (vaCommandText + interimText).trim() || 'Listening...';
+        }
+
+        // Reset silence timer on each result
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+            if (vaCommandRecognition) {
+                try { vaCommandRecognition.stop(); } catch(e) {}
+            }
+        }, 2000);
+    };
+
+    vaCommandRecognition.onerror = (event) => {
+        console.log('[VA] Command capture error:', event.error);
+        if (event.error === 'no-speech') {
+            // Timeout — no speech after activation
+            if (transcriptText) transcriptText.textContent = 'No speech detected';
+            setTimeout(() => {
+                setVoiceState(VA_STATE.STANDBY);
+                hideElement('voiceTranscriptDisplay');
+                startWakeWordListener();
+            }, 1500);
+            return;
+        }
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            // Verify with getUserMedia before showing error
+            checkMicPermission().then(hasAccess => {
+                if (!hasAccess) {
+                    showMicDeniedError();
+                } else {
+                    // Transient — go back to standby
+                    console.warn('[VA] Command capture got not-allowed but mic is fine — returning to standby');
+                    setVoiceState(VA_STATE.STANDBY);
+                    hideElement('voiceTranscriptDisplay');
+                    startWakeWordListener();
+                }
+            });
+            return;
+        }
+        // For other errors (aborted, audio-capture, network) — return to standby
+        setVoiceState(VA_STATE.STANDBY);
+        hideElement('voiceTranscriptDisplay');
+        startWakeWordListener();
+    };
+
+    vaCommandRecognition.onend = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        const command = vaCommandText.trim();
+        if (command) {
+            processVoiceCommand(command);
+        } else {
+            // No text captured
+            if (transcriptText) transcriptText.textContent = 'No speech detected';
+            setTimeout(() => {
+                setVoiceState(VA_STATE.STANDBY);
+                hideElement('voiceTranscriptDisplay');
+                startWakeWordListener();
+            }, 1500);
+        }
+    };
+
+    try {
+        vaCommandRecognition.start();
+        console.log('[VA] Command capture started');
+    } catch(e) {
+        console.warn('[VA] Could not start command capture:', e);
+        setVoiceState(VA_STATE.STANDBY);
+        startWakeWordListener();
+    }
+}
+
+function stopCommandCapture() {
+    if (vaCommandRecognition) {
+        try { vaCommandRecognition.abort(); } catch(e) {}
+        vaCommandRecognition = null;
+    }
+}
+
+// --- Process & Send Command ---
+
+function processVoiceCommand(command) {
+    console.log('[VA] Processing command:', command);
+    setVoiceState(VA_STATE.PROCESSING);
+
+    const transcriptText = document.getElementById('voiceTranscriptText');
+    if (transcriptText) transcriptText.textContent = command;
+
+    // Send via dashboard WebSocket
+    if (dashboardWs && dashboardWs.readyState === WebSocket.OPEN) {
+        dashboardWs.send(JSON.stringify({
+            type: 'voice_command',
+            command: command
+        }));
+
+        // Optimistically show as sent — will be confirmed by server response
+        addVoiceCommandToHistory(command, 'sent');
+        showVoiceFeedback('success', `Command sent: "${command.substring(0, 60)}${command.length > 60 ? '...' : ''}"`);
+    } else {
+        addVoiceCommandToHistory(command, 'failed');
+        showVoiceFeedback('error', 'Not connected to server. Please refresh the page.');
+    }
+
+    // Return to standby after brief delay
+    setTimeout(() => {
+        setVoiceState(VA_STATE.STANDBY);
+        hideElement('voiceTranscriptDisplay');
+        startWakeWordListener();
+    }, 3000);
+}
+
+function handleVoiceCommandStatus(data) {
+    if (data.status === 'error') {
+        showVoiceFeedback('error', data.message || 'Failed to send command');
+        // Update last history item
+        const items = document.querySelectorAll('.voice-history-status');
+        if (items.length > 0) {
+            const last = items[0];
+            last.textContent = 'Failed';
+            last.className = 'voice-history-status failed';
+        }
+    }
+}
+
+// --- UI Helpers ---
+
+function setVoiceState(newState) {
+    vaState = newState;
+    const orb = document.getElementById('voiceOrb');
+    const statusText = document.getElementById('voiceStatusText');
+    const statusHint = document.getElementById('voiceStatusHint');
+
+    if (!orb) return;
+
+    // Remove all state classes
+    orb.className = 'voice-orb ' + newState;
+
+    switch (newState) {
+        case VA_STATE.DISABLED:
+            if (statusText) statusText.textContent = 'Disabled';
+            if (statusHint) statusHint.textContent = 'Turn on the toggle to start';
+            break;
+        case VA_STATE.STANDBY:
+            if (statusText) statusText.textContent = 'Listening...';
+            if (statusHint) statusHint.textContent = 'Say "Hey Geni" to activate';
+            break;
+        case VA_STATE.ACTIVATED:
+            if (statusText) statusText.textContent = 'Speak now';
+            if (statusHint) statusHint.textContent = 'Tell me what you want to automate';
+            break;
+        case VA_STATE.PROCESSING:
+            if (statusText) statusText.textContent = 'Processing...';
+            if (statusHint) statusHint.textContent = 'Sending your command';
+            break;
+        case VA_STATE.CONFIRMATION:
+            if (statusText) statusText.textContent = 'Done';
+            if (statusHint) statusHint.textContent = '';
+            break;
+    }
+}
+
+function showVoiceFeedback(type, message) {
+    const fb = document.getElementById('voiceFeedback');
+    const icon = document.getElementById('voiceFeedbackIcon');
+    const msg = document.getElementById('voiceFeedbackMessage');
+    if (!fb) return;
+
+    fb.className = 'voice-feedback ' + type;
+    fb.style.display = 'flex';
+
+    if (icon) {
+        icon.className = type === 'success'
+            ? 'bi bi-check-circle-fill voice-feedback-icon'
+            : 'bi bi-exclamation-circle-fill voice-feedback-icon';
+    }
+    if (msg) msg.textContent = message;
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => { hideElement('voiceFeedback'); }, 5000);
+}
+
+function addVoiceCommandToHistory(command, status) {
+    const entry = {
+        command: command,
+        status: status,
+        timestamp: new Date()
+    };
+    vaCommandHistory.unshift(entry);
+    if (vaCommandHistory.length > 20) vaCommandHistory.pop();
+
+    renderVoiceCommandHistory();
+}
+
+function renderVoiceCommandHistory() {
+    const container = document.getElementById('voiceCommandHistory');
+    const eraseBtn = document.getElementById('eraseVoiceHistoryBtn');
+    if (!container) return;
+
+    if (vaCommandHistory.length === 0) {
+        container.innerHTML = '<div class="list-group-item text-center text-muted">No voice commands yet</div>';
+        if (eraseBtn) eraseBtn.disabled = true;
+        return;
+    }
+
+    if (eraseBtn) eraseBtn.disabled = false;
+
+    container.innerHTML = vaCommandHistory.slice(0, 10).map(entry => {
+        const timeStr = entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = entry.timestamp.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        return `
+            <div class="list-group-item voice-history-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="voice-history-command">${escapeHtml(entry.command)}</div>
+                    <span class="voice-history-status ${entry.status}">${entry.status === 'sent' ? 'Sent' : 'Failed'}</span>
+                </div>
+                <div class="voice-history-meta">${dateStr} at ${timeStr}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function eraseVoiceHistory() {
+    if (vaCommandHistory.length === 0) return;
+
+    if (!confirm('Are you sure you want to erase all voice command history?')) {
+        return;
+    }
+
+    vaCommandHistory = [];
+    renderVoiceCommandHistory();
+    showToast('Voice command history cleared.', 'success');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function hideElement(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
 }

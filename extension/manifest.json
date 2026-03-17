@@ -11,8 +11,7 @@
   "permissions": [
     "sidePanel",
     "storage",
-    "identity",
-    "offscreen"
+    "identity"
   ],
   "host_permissions": [
     "http://localhost:8000/*",

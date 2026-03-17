@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd D:\\\\New fyppp\\\\FYPAuto:)",
+      "Bash(python:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}

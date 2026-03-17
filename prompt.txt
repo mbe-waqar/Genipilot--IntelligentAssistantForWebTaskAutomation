@@ -1,132 +1,47 @@
-STOP. DO NOT WRITE OR CHANGE ANY CODE YET.
+Role:
 
-=====================================
-CRITICAL PROBLEM
-=====================================
+You are a Senior Full-Stack Web Developer with deep expertise in frontend architecture, UI/UX debugging, JavaScript, CSS layout systems, and browser-based Web APIs. You have extensive experience building and maintaining production-grade dashboards, fixing responsive layout issues, implementing SPA navigation, and integrating voice/audio features using both native browser APIs and third-party TTS services. You write clean, maintainable, and well-commented code and always consider edge cases, cross-browser compatibility, and user experience in every fix you apply.
 
-- User has **permanently blocked microphone** in Chrome settings
-- Voice input fails with:
-    ❌ Permission denied. Please try again.
-- Automation, multi-intent task handling, and agent success verification are already fixed
-- We must now **gracefully handle mic denial** while preserving system stability
 
-=====================================
-EXPECTED BEHAVIOR
-=====================================
+Bug Fix Prompt:
 
-1️⃣ If microphone is permanently blocked:
+Fix the following three issues found in the GeniPilot dashboard (dashboard.html and related files):
 
-- Extension must detect the true permission state
-- Display a clear, actionable warning to the user:
-    "Microphone access permanently denied. Enable it in Chrome settings to use voice input."
-- **Do NOT attempt to start voice input**
-- Automation tasks must continue unaffected
+Issue 1 — Task Types Distribution Chart Shrinks When Browser Extension Is Open
+The Task Types Distribution donut chart shrinks and its legend text scales up disproportionately when a browser extension panel (e.g., AI Chat Assistant sidebar) is open on the right side, reducing the effective viewport width.
+Fix Requirements:
 
-2️⃣ If microphone is temporarily denied:
+Set a min-width (e.g., 280px) and a fixed height (e.g., 280px) on the Task Types Distribution chart container so it does not shrink below a usable size.
+Add flex-shrink: 0 to the chart card/container so it resists compression in flex layouts.
+Ensure the Chart.js canvas element has explicit width and height attributes, or is wrapped in a div with overflow: hidden and fixed dimensions.
+Define legend text font size in px or rem (not em or %) so it does not scale relative to the shrunken container.
+Optionally wrap the charts section in a min-width: 600px container with overflow-x: auto to prevent layout breakage on narrow viewports.
+Reference: Image 2 (extension closed) shows the correct baseline size and proportion. Image 1 (extension open) shows the broken state.
 
-- Extension can prompt user to allow
-- Normal voice workflow resumes once allowed
 
-3️⃣ No regression:
+Issue 2 — GeniPilot Logo Redirects to Browser Home Page Instead of Dashboard
+Clicking the GeniPilot logo in the sidebar navigates the user away to the browser's default home page instead of staying within the app.
+Fix Requirements:
 
-- Multi-intent tasks → single task entry  
-- Agent success verification → state-based checks  
-- Automation still runs in real Chrome tabs  
-- No false failures or crashes
+Locate the anchor tag wrapping the GeniPilot logo in the sidebar.
+Change its href to point to the correct internal route (e.g., dashboard.html#overview or / depending on the routing setup).
+If using a JavaScript router (e.g., SPA), replace the <a href> with an onclick handler that calls the internal navigation function instead of triggering a full page reload.
+Ensure the logo never navigates outside the application under any circumstance.
 
-=====================================
-YOUR TASK — CREATE A SYSTEM PLAN
-=====================================
 
-Provide a STEP-BY-STEP plan covering:
+Issue 3 — Replace Audio Voice With a Beautiful Female Voice
+The current voice used by the Voice Assistant or any text-to-speech (TTS) feature sounds robotic or uses a default male/neutral voice.
+Fix Requirements:
 
--------------------------------------
-1️⃣ PERMISSION DETECTION
--------------------------------------
+If using the Web Speech API (SpeechSynthesis), filter available voices using speechSynthesis.getVoices() and select a high-quality female voice (e.g., Google UK English Female, Microsoft Zira, or en-US female voices). Add a fallback chain in case the preferred voice is unavailable on the user's system.
+If using a third-party TTS API (e.g., ElevenLabs, Google Cloud TTS, Amazon Polly), switch the voice ID/model to a natural-sounding female voice such as en-US-Neural2-F (Google), Joanna or Ruth (Amazon Polly), or an ElevenLabs female voice model.
+Ensure the voice selection logic runs after voices are fully loaded (use the voiceschanged event for Web Speech API).
+The voice should sound natural, clear, and pleasant — not robotic or monotone.
 
-- Use `navigator.permissions.query({name: "microphone"})` to detect:
-    - granted
-    - denied
-    - prompt
-- Detect permanent denial (`denied` + no prompt)
-- Differentiate from temporary denial
 
--------------------------------------
-2️⃣ EXTENSION UI HANDLING
--------------------------------------
+General Guidelines:
 
-- If permanently denied:
-    - Show clear UI message in extension
-    - Disable voice button
-    - Provide instructions to enable in Chrome settings
-- If temporarily denied:
-    - Prompt user to allow
-    - Retry after user approval
-
--------------------------------------
-3️⃣ BACKEND AND AGENT STABILITY
--------------------------------------
-
-- Ensure mic permission failure **does not affect**:
-    - Multi-step tasks  
-    - Multi-intent single task handling  
-    - Agent post-condition verification  
-- Tasks continue via text input or other triggers
-- Do not auto-mark tasks failed because mic unavailable
-
--------------------------------------
-4️⃣ LOGGING
--------------------------------------
-
-- Log mic permission state:
-    - Denied
-    - Granted
-    - Prompt
-- Log attempted voice inputs
-- Avoid false "Permission denied" errors
-
--------------------------------------
-5️⃣ FAILSAFE & FALLBACK
--------------------------------------
-
-- If voice input unavailable:
-    - Allow user to type commands as fallback
-    - Ensure automation pipeline works normally
-    - No silent failure
-
--------------------------------------
-6️⃣ EDGE CASES
--------------------------------------
-
-- User blocks mic after already giving permission
-- User refreshes extension
-- Multiple tasks running
-- Human-in-the-loop tasks
-- Chrome or OS-level mic disconnection
-
--------------------------------------
-7️⃣ STABILITY GUARANTEES
--------------------------------------
-
-- No regression of:
-    - Multi-intent → single task
-    - Agent success verification
-    - Chrome automation in real tabs
-    - Task history accuracy
-
-=====================================
-IMPORTANT RULES
-=====================================
-
-- DO NOT implement code yet
-- Focus on **graceful handling** of mic permission
-- Keep previously fixed features stable
-- Ensure automation and task flow remain fully functional
-- Detect permanent vs temporary denial correctly
-
-=====================================
-FINAL INSTRUCTION
-=====================================
-
-Provide ONLY the detailed architectural plan for handling mic permission denial while preserving all other features.  
-Wait for approval before coding.
+Do not break any existing functionality while applying these fixes.
+Ensure all fixes are cross-browser compatible (Chrome, Edge, Firefox).
+Add brief inline comments explaining each fix for future maintainability.
+Test each fix in isolation before combining them into the final solution.
