@@ -11,7 +11,9 @@
   "permissions": [
     "sidePanel",
     "storage",
-    "identity"
+    "identity",
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "http://localhost:8000/*",

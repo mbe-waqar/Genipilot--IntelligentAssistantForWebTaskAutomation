@@ -3172,6 +3172,13 @@ hr {
   .cs_site_header.cs_style_1 .cs_nav_list > li {
     margin-right: 50px;
   }
+  .cs_site_branding + .cs_main_header_center {
+    margin-left: 50px;
+  }
+  .cs_site_branding img {
+    height: 34px;
+    width: auto;
+  }
 }
 @media screen and (min-width: 1200px) {
   .cs_main_header {
@@ -3184,8 +3191,13 @@ hr {
   .cs_site_branding {
     display: inline-block;
   }
+  .cs_site_branding img {
+    height: 34px;
+    width: auto;
+    image-rendering: -webkit-optimize-contrast;
+  }
   .cs_site_branding + .cs_main_header_center {
-    margin-left: 40px;
+    margin-left: 22px;
   }
   .cs_site_header.cs_style_1 .cs_main_header_center {
     display: flex;
@@ -3211,7 +3223,7 @@ hr {
     height: inherit;
   }
   .cs_nav .cs_nav_list > li {
-    margin-right: 30px;
+    margin-right: 22px;
     height: inherit;
     position: relative;
   }
@@ -6980,4 +6992,806 @@ hr {
   .cs_team_details p {
     font-size: 16px;
   }
-}/*# sourceMappingURL=style.css.map */
+}
+
+
+/*--------------------------------------------------------------
+  23. Dashboard — Pricing Cards
+----------------------------------------------------------------*/
+.pricing-cards-row {
+  padding: 8px 0;
+}
+
+.pricing-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(1,107,97,0.08);
+  box-shadow: 0 2px 8px rgba(1,107,97,0.04);
+  padding: 0;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pricing-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 32px rgba(1,107,97,0.12);
+}
+
+.pricing-card-active {
+  border-color: #016B61;
+  box-shadow: 0 4px 20px rgba(1,107,97,0.15);
+}
+
+.pricing-card-featured {
+  border-color: #016B61;
+  box-shadow: 0 4px 20px rgba(1,107,97,0.15);
+}
+
+.pricing-popular-badge {
+  position: absolute;
+  top: 16px;
+  right: -30px;
+  background: linear-gradient(135deg, #016B61, #00A699);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 40px;
+  transform: rotate(45deg);
+  z-index: 2;
+}
+
+.pricing-card-header {
+  padding: 32px 28px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(1,107,97,0.06);
+}
+
+.pricing-plan-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #016B61, #00A699);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+.pricing-plan-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0d3530;
+  margin-bottom: 8px;
+}
+
+.pricing-price {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #016B61;
+  line-height: 1;
+}
+
+.pricing-currency {
+  font-size: 1.2rem;
+  vertical-align: top;
+  position: relative;
+  top: 8px;
+}
+
+.pricing-period {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #718096;
+}
+
+.pricing-card-body {
+  padding: 24px 28px;
+  flex: 1;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pricing-features li {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pricing-features li.included {
+  color: #0d3530;
+}
+
+.pricing-features li.included i {
+  color: #059669;
+  font-size: 1rem;
+}
+
+.pricing-features li.excluded {
+  color: #a0aec0;
+}
+
+.pricing-features li.excluded i {
+  color: #cbd5e0;
+  font-size: 1rem;
+}
+
+.pricing-card-footer {
+  padding: 20px 28px 28px;
+}
+
+.pricing-btn {
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.pricing-btn-current {
+  background: rgba(1,107,97,0.08);
+  color: #016B61;
+  border: 1px solid rgba(1,107,97,0.2);
+  cursor: default;
+}
+
+.pricing-btn-upgrade {
+  background: linear-gradient(135deg, #016B61, #00A699);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 12px rgba(1,107,97,0.3);
+}
+
+.pricing-btn-upgrade:hover {
+  background: linear-gradient(135deg, #014d46, #016B61);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(1,107,97,0.4);
+  transform: translateY(-1px);
+}
+
+.pricing-downgrade-link {
+  color: #718096;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.pricing-downgrade-link:hover {
+  color: #dc2626;
+}
+
+@keyframes pricingUpgradeSuccess {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.03); box-shadow: 0 8px 30px rgba(5,150,105,0.3); }
+  50% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+.pricing-upgrade-success {
+  animation: pricingUpgradeSuccess 0.8s ease;
+}
+
+
+/*--------------------------------------------------------------
+  24. Dashboard — Toast Notifications
+----------------------------------------------------------------*/
+.toast-notif-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 380px;
+}
+
+.notif-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  border: 1px solid rgba(1,107,97,0.08);
+  min-width: 300px;
+}
+
+.notif-toast-show {
+  animation: notifSlideIn 0.3s ease;
+}
+
+.notif-toast-hide {
+  animation: notifSlideOut 0.3s ease forwards;
+}
+
+@keyframes notifSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes notifSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+.notif-toast-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.notif-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-toast-message {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #0d3530;
+  line-height: 1.4;
+}
+
+.notif-toast-time {
+  font-size: 0.75rem;
+  color: #718096;
+  margin-top: 2px;
+}
+
+.notif-toast-close {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.notif-toast-close:hover {
+  color: #4a5568;
+}
+
+
+/*--------------------------------------------------------------
+  25. Dashboard — Usage Card / Progress Bar
+----------------------------------------------------------------*/
+.usage-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 0;
+  border: 1px solid rgba(1,107,97,0.1);
+  box-shadow: 0 2px 12px rgba(1,107,97,0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.usage-card:hover {
+  box-shadow: 0 8px 28px rgba(1,107,97,0.12);
+  transform: translateY(-2px);
+}
+
+.usage-card-header {
+  background: linear-gradient(135deg, #0a2a25 0%, #016B61 60%, #00A699 100%);
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usage-card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.usage-card-title h5 {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.usage-subtitle {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.75rem;
+}
+
+.usage-icon-wrap {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(4px);
+  border-radius: 10px;
+  color: #FED91F;
+  font-size: 1.1rem;
+}
+
+.usage-plan-badge {
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.72rem;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  letter-spacing: 0.3px;
+}
+
+.usage-meters {
+  padding: 20px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.usage-meter {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.usage-meter-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(1,107,97,0.1), rgba(0,166,153,0.1));
+  border-radius: 8px;
+  color: #016B61;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.usage-meter-icon.scheduled {
+  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1));
+  color: #6366f1;
+}
+
+.usage-meter-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.usage-label {
+  font-size: 0.82rem;
+  color: #4a5568;
+  font-weight: 500;
+}
+
+.usage-value {
+  font-size: 0.82rem;
+  color: #0d3530;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-progress-bar {
+  height: 8px;
+  background: #E8F1EF;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.usage-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #016B61, #00A699);
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.usage-progress-fill.usage-progress-warning {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+  box-shadow: 0 0 8px rgba(217,119,6,0.3);
+}
+
+.usage-progress-fill.usage-progress-danger {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+  box-shadow: 0 0 8px rgba(220,38,38,0.3);
+  animation: usage-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes usage-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(220,38,38,0.3); }
+  50% { box-shadow: 0 0 14px rgba(220,38,38,0.5); }
+}
+
+.usage-upgrade-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #016B61;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  padding: 12px 24px 18px;
+}
+
+.usage-upgrade-link:hover {
+  color: #00A699;
+  transform: translateX(3px);
+}
+
+
+/*--------------------------------------------------------------
+  26. Dashboard — Onboarding Tour
+----------------------------------------------------------------*/
+.tour-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.tour-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  pointer-events: auto;
+}
+
+.tour-tooltip {
+  position: fixed;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 20px 24px;
+  max-width: 320px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+  border: 1px solid rgba(1,107,97,0.15);
+  z-index: 10001;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease, top 0.3s ease, left 0.3s ease;
+}
+
+.tour-tooltip-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0d3530;
+  margin-bottom: 8px;
+}
+
+.tour-tooltip-text {
+  font-size: 0.88rem;
+  color: #4a5568;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.tour-tooltip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tour-step-indicator {
+  font-size: 0.78rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+.tour-tooltip-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-highlight {
+  position: relative;
+  z-index: 10001;
+  box-shadow: 0 0 0 4px rgba(1,107,97,0.3), 0 0 20px rgba(1,107,97,0.15);
+  border-radius: 8px;
+}
+
+
+/*--------------------------------------------------------------
+  27. Dashboard — Export Button
+----------------------------------------------------------------*/
+.export-btn {
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.export-btn i {
+  margin-right: 4px;
+}
+
+
+/*--------------------------------------------------------------
+  30. Dashboard — Re-run Button (Premium Glass Chip)
+----------------------------------------------------------------*/
+.btn-rerun {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 2px 6px rgba(99, 102, 241, 0.2);
+  text-decoration: none;
+}
+
+.btn-rerun:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 6px 20px rgba(99, 102, 241, 0.35);
+  filter: brightness(1.08);
+  color: #fff;
+}
+
+.btn-rerun:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    0 1px 3px rgba(99, 102, 241, 0.2);
+}
+
+.btn-rerun i {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.85rem;
+}
+
+.btn-rerun:hover i {
+  transform: rotate(360deg);
+}
+
+
+/*--------------------------------------------------------------
+  31. Dashboard — Retry Button (Ghost → Filled on Hover)
+----------------------------------------------------------------*/
+/* Action buttons in table rows — fixed width so View and Re-run are identical size */
+.btn-details {
+  min-width: 80px;
+  padding: 5px 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+
+/*--------------------------------------------------------------
+  32. Website — Pricing Cards
+----------------------------------------------------------------*/
+.cs_pricing_card {
+  background: #ffffff;
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(1, 50, 40, 0.06);
+  border: 1px solid rgba(1, 50, 40, 0.08);
+  padding: 0;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.cs_pricing_card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(1, 50, 40, 0.12);
+}
+
+.cs_pricing_card_header {
+  padding: 32px 28px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(1, 50, 40, 0.06);
+}
+
+.cs_pricing_card_tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #013228;
+  background: rgba(1, 50, 40, 0.06);
+  padding: 4px 14px;
+  border-radius: 50px;
+  margin-bottom: 12px;
+}
+
+.cs_pricing_card_title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #013228;
+}
+
+.cs_pricing_card_price {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.cs_pricing_card_amount {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #013228;
+  line-height: 1;
+}
+
+.cs_pricing_card_period {
+  font-size: 1rem;
+  color: #6c757d;
+}
+
+.cs_pricing_card_desc {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 0;
+}
+
+.cs_pricing_card_body {
+  padding: 24px 28px;
+  flex: 1;
+}
+
+.cs_pricing_card_features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.cs_pricing_card_features li {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.cs_pricing_card_features li:last-child {
+  border-bottom: none;
+}
+
+.cs_pricing_card_features li i.fa-check {
+  color: #013228;
+  font-size: 0.8rem;
+  width: 18px;
+  height: 18px;
+  background: rgba(1, 50, 40, 0.08);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cs_pricing_feature_disabled {
+  opacity: 0.4;
+}
+
+.cs_pricing_feature_disabled i.fa-xmark {
+  color: #999;
+  font-size: 0.8rem;
+  width: 18px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cs_pricing_card_footer {
+  padding: 20px 28px 28px;
+  text-align: center;
+}
+
+.cs_pricing_card_btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Popular / Pro Card Highlight */
+.cs_pricing_card_popular {
+  border: 2px solid transparent;
+  background-image: linear-gradient(#fff, #fff), linear-gradient(135deg, #D324A8, #551DFF);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 8px 30px rgba(211, 36, 168, 0.15);
+  transform: scale(1.03);
+}
+
+.cs_pricing_card_popular:hover {
+  transform: scale(1.03) translateY(-6px);
+  box-shadow: 0 16px 50px rgba(211, 36, 168, 0.22);
+}
+
+.cs_pricing_card_badge {
+  position: absolute;
+  top: 0;
+  right: 24px;
+  background: linear-gradient(135deg, #D324A8, #551DFF);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border-radius: 0 0 10px 10px;
+}
+
+.cs_pricing_card_popular .cs_pricing_card_tag {
+  background: linear-gradient(135deg, rgba(211,36,168,0.1), rgba(85,29,255,0.1));
+  color: #551DFF;
+}
+
+.cs_pricing_card_popular .cs_pricing_card_amount {
+  background: linear-gradient(135deg, #D324A8, #551DFF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cs_pricing_card_popular .cs_pricing_card_features li i.fa-check {
+  color: #fff;
+  background: linear-gradient(135deg, #D324A8, #551DFF);
+}
+
+@media (max-width: 991px) {
+  .cs_pricing_card_popular {
+    transform: scale(1);
+  }
+  .cs_pricing_card_popular:hover {
+    transform: translateY(-6px);
+  }
+}
+/*# sourceMappingURL=style.css.map */

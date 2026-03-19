@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cd D:\\\\New fyppp\\\\FYPAuto:)",
       "Bash(python:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(node --check templates/assets/js/dashboard.js)",
+      "Bash(node --check extension/sidebar.js)"
     ]
   }
 }

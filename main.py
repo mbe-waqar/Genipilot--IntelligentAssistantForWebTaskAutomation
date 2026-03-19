@@ -385,6 +385,13 @@ def integrations(request: Request):
     return templates.TemplateResponse("integrations.html", {"request": request})
 
 
+@app.get("/pricing", response_class=HTMLResponse)
+@app.get("/pricing.html", response_class=HTMLResponse)
+def pricing(request: Request):
+    """Render pricing page"""
+    return templates.TemplateResponse("pricing.html", {"request": request})
+
+
 @app.get("/faqs", response_class=HTMLResponse)
 @app.get("/faqs.html", response_class=HTMLResponse)
 def faqs(request: Request):
@@ -2150,6 +2157,214 @@ def update_user_settings(request: Request, settings_data: UpdateSettingsRequest)
         "success": True,
         "message": "Settings saved successfully"
     })
+
+
+# ============================================================================
+# Plan / Subscription Endpoints
+# ============================================================================
+
+@app.get("/api/plan-info")
+async def api_plan_info(request: Request, email: str = None):
+    """Get current plan info for a user."""
+    from plan_module import get_user_plan_info
+    user_email = email
+    if not user_email:
+        # Try Starlette session (used by other endpoints)
+        user = get_current_user(request)
+        if user:
+            user_email = user["email"]
+    if not user_email:
+        # Try cookie-based session as fallback
+        session_token = request.cookies.get("session_token")
+        if session_token:
+            session = await db["sessions"].find_one({"token": session_token})
+            if session:
+                user_email = session.get("email")
+    if not user_email:
+        return JSONResponse(status_code=400, content={"error": "email parameter required"})
+
+    try:
+        info = await get_user_plan_info(user_email)
+        return JSONResponse(content=info)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/api/upgrade")
+async def api_upgrade_plan(request: Request):
+    """Upgrade user plan (simulated — no real payment)."""
+    from plan_module import upgrade_plan
+    data = await request.json()
+    user_email = data.get("email")
+    new_plan = data.get("plan")
+
+    if not user_email or not new_plan:
+        return JSONResponse(status_code=400, content={"error": "email and plan required"})
+
+    result = await upgrade_plan(user_email, new_plan)
+    status_code = 200 if result["success"] else 400
+    return JSONResponse(status_code=status_code, content=result)
+
+
+@app.post("/api/downgrade")
+async def api_downgrade_plan(request: Request):
+    """Downgrade user to free plan."""
+    from plan_module import downgrade_plan
+    data = await request.json()
+    user_email = data.get("email")
+
+    if not user_email:
+        return JSONResponse(status_code=400, content={"error": "email required"})
+
+    result = await downgrade_plan(user_email)
+    return JSONResponse(content=result)
+
+
+# ============================================================================
+# Export Endpoints
+# ============================================================================
+
+@app.get("/api/history/export")
+async def api_export_history(request: Request, email: str = None,
+                              format: str = "json",
+                              from_date: str = None, to_date: str = None):
+    """Export automation history as CSV or JSON."""
+    from models import AutomationHistoryDB
+    from datetime import datetime as dt
+    import csv
+    import io
+
+    user_email = email
+    if not user_email:
+        user = get_current_user(request)
+        if user:
+            user_email = user["email"]
+    if not user_email:
+        session_token = request.cookies.get("session_token")
+        if session_token:
+            session = await db["sessions"].find_one({"token": session_token})
+            if session:
+                user_email = session.get("email")
+    if not user_email:
+        return JSONResponse(status_code=400, content={"error": "email parameter required"})
+
+    # Parse dates
+    parsed_from = None
+    parsed_to = None
+    try:
+        if from_date:
+            parsed_from = dt.fromisoformat(from_date)
+        if to_date:
+            parsed_to = dt.fromisoformat(to_date)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid date format. Use ISO format."})
+
+    records = await AutomationHistoryDB.get_for_export(user_email, parsed_from, parsed_to)
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Date", "Task", "Status", "Duration (s)", "Result", "URLs"])
+        for r in records:
+            writer.writerow([
+                str(r.get("start_time", "")),
+                r.get("task_name", ""),
+                r.get("status", ""),
+                r.get("duration_seconds", ""),
+                (r.get("final_result") or "")[:200],
+                ", ".join(r.get("urls_visited", [])[:5])
+            ])
+        csv_content = output.getvalue()
+        from starlette.responses import Response
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=automation_history.csv"}
+        )
+    else:
+        # JSON export — clean up ObjectId and datetime
+        for r in records:
+            r["_id"] = str(r.get("_id", ""))
+            for key in ["start_time", "end_time", "created_at"]:
+                if key in r and r[key]:
+                    r[key] = str(r[key])
+        return JSONResponse(content=records, headers={
+            "Content-Disposition": "attachment; filename=automation_history.json"
+        })
+
+
+# ============================================================================
+# Task Re-run Endpoint
+# ============================================================================
+
+@app.post("/api/rerun")
+async def api_rerun_task(request: Request):
+    """Re-run a previous automation task."""
+    from models import AutomationHistoryDB
+    data = await request.json()
+    task_id = data.get("task_id")
+    user_email = data.get("email")
+
+    if not task_id or not user_email:
+        return JSONResponse(status_code=400, content={"error": "task_id and email required"})
+
+    # Fetch original task
+    original = await AutomationHistoryDB.get_by_id(task_id)
+    if not original:
+        return JSONResponse(status_code=404, content={"error": "Task not found"})
+
+    if original.get("user_email") != user_email:
+        return JSONResponse(status_code=403, content={"error": "Not authorized"})
+
+    task_description = original.get("task_description", original.get("task_name", ""))
+
+    # Store pending rerun in DB so the extension can pick it up
+    try:
+        db["pending_reruns"].delete_many({"user_email": user_email})
+        db["pending_reruns"].insert_one({
+            "user_email": user_email,
+            "task_description": task_description,
+            "original_task_id": task_id,
+            "created_at": datetime.utcnow()
+        })
+    except Exception as e:
+        print(f"Error storing pending rerun: {e}")
+
+    return JSONResponse(content={
+        "success": True,
+        "task_description": task_description,
+        "original_task_id": task_id,
+        "message": f"Re-running: {task_description[:100]}"
+    })
+
+
+@app.get("/api/pending-rerun")
+async def api_pending_rerun(request: Request, email: str = None):
+    """Check and consume a pending rerun task for the user."""
+    user_email = None
+    try:
+        user = get_current_user(request)
+        if user:
+            user_email = user.get("email") if isinstance(user, dict) else user
+    except Exception:
+        pass
+    if not user_email and email:
+        user_email = email
+
+    if not user_email:
+        return JSONResponse(content={"pending": False})
+
+    try:
+        doc = db["pending_reruns"].find_one_and_delete({"user_email": user_email})
+        if doc:
+            return JSONResponse(content={
+                "pending": True,
+                "task_description": doc.get("task_description", "")
+            })
+    except Exception as e:
+        print(f"Error fetching pending rerun: {e}")
+
+    return JSONResponse(content={"pending": False})
 
 
 # ============================================================================

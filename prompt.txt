@@ -1,47 +1,278 @@
-Role:
+================================================================================
+CHROME EXTENSION — "SUMMARIZE THIS PAGE" SENDS WRONG TAB / BLANK TAB BUG
+================================================================================
 
-You are a Senior Full-Stack Web Developer with deep expertise in frontend architecture, UI/UX debugging, JavaScript, CSS layout systems, and browser-based Web APIs. You have extensive experience building and maintaining production-grade dashboards, fixing responsive layout issues, implementing SPA navigation, and integrating voice/audio features using both native browser APIs and third-party TTS services. You write clean, maintainable, and well-commented code and always consider edge cases, cross-browser compatibility, and user experience in every fix you apply.
+CONTEXT:
+GeniPilot is a Chrome extension (Manifest V3 side panel) that lets users type
+automation commands like "summarize this page". The extension sidebar
+(sidebar.js) communicates with the agent server (agent_server.py) via WebSocket.
+The agent server runs browser automation using browser-use connecting to Chrome
+via CDP (Chrome DevTools Protocol) at localhost:9222.
 
+CRITICAL RULE: Do NOT break or alter any existing functionality — message
+sending, WebSocket streaming, image attach, TTS, templates, stop/cancel,
+plan limits, scheduled tasks, re-run, HITL input modals, onboarding tour,
+or any other feature must all continue to work exactly as they do now.
 
-Bug Fix Prompt:
+================================================================================
+BUG DESCRIPTION
+================================================================================
 
-Fix the following three issues found in the GeniPilot dashboard (dashboard.html and related files):
+When the user has multiple Chrome tabs open (e.g., Tab 1: YouTube, Tab 2:
+Gmail, Tab 3: SalmanFoods, Tab 4: Wikipedia) and is CURRENTLY VIEWING the
+SalmanFoods tab, then types "summarize this page" in the extension sidebar:
 
-Issue 1 — Task Types Distribution Chart Shrinks When Browser Extension Is Open
-The Task Types Distribution donut chart shrinks and its legend text scales up disproportionately when a browser extension panel (e.g., AI Chat Assistant sidebar) is open on the right side, reducing the effective viewport width.
-Fix Requirements:
+  BUG 1: Agent opens a NEW BLANK tab (about:blank) and returns empty content
+  BUG 2: Agent summarizes the WRONG tab (e.g., YouTube instead of SalmanFoods)
+  EXPECTED: Agent should summarize the SalmanFoods tab — the one the user
+            is currently looking at
 
-Set a min-width (e.g., 280px) and a fixed height (e.g., 280px) on the Task Types Distribution chart container so it does not shrink below a usable size.
-Add flex-shrink: 0 to the chart card/container so it resists compression in flex layouts.
-Ensure the Chart.js canvas element has explicit width and height attributes, or is wrapped in a div with overflow: hidden and fixed dimensions.
-Define legend text font size in px or rem (not em or %) so it does not scale relative to the shrunken container.
-Optionally wrap the charts section in a min-width: 600px container with overflow-x: auto to prevent layout breakage on narrow viewports.
-Reference: Image 2 (extension closed) shows the correct baseline size and proportion. Image 1 (extension open) shows the broken state.
+This affects ALL "current page" commands — not just summarize:
+  - "summarize this page"
+  - "extract all links from this page"
+  - "what is this page about"
+  - "fill out the form on this page"
+  - Any task referencing "this page", "current page", "this tab", "this site"
 
+================================================================================
+ROOT CAUSE ANALYSIS
+================================================================================
 
-Issue 2 — GeniPilot Logo Redirects to Browser Home Page Instead of Dashboard
-Clicking the GeniPilot logo in the sidebar navigates the user away to the browser's default home page instead of staying within the app.
-Fix Requirements:
+There are TWO separate failures causing this bug:
 
-Locate the anchor tag wrapping the GeniPilot logo in the sidebar.
-Change its href to point to the correct internal route (e.g., dashboard.html#overview or / depending on the routing setup).
-If using a JavaScript router (e.g., SPA), replace the <a href> with an onclick handler that calls the internal navigation function instead of triggering a full page reload.
-Ensure the logo never navigates outside the application under any circumstance.
+─── FAILURE 1: Extension never sends current tab URL ───────────────────────────
 
+File: extension/sidebar.js
+Function: sendMessage() (inside initChat())
+Lines: ~1118-1128
 
-Issue 3 — Replace Audio Voice With a Beautiful Female Voice
-The current voice used by the Voice Assistant or any text-to-speech (TTS) feature sounds robotic or uses a default male/neutral voice.
-Fix Requirements:
+The WebSocket payload sent to the server is:
+    const payload = { message: message };
+    if (imageData) { payload.image = imageData; }
+    websocket.send(JSON.stringify(payload));
 
-If using the Web Speech API (SpeechSynthesis), filter available voices using speechSynthesis.getVoices() and select a high-quality female voice (e.g., Google UK English Female, Microsoft Zira, or en-US female voices). Add a fallback chain in case the preferred voice is unavailable on the user's system.
-If using a third-party TTS API (e.g., ElevenLabs, Google Cloud TTS, Amazon Polly), switch the voice ID/model to a natural-sounding female voice such as en-US-Neural2-F (Google), Joanna or Ruth (Amazon Polly), or an ElevenLabs female voice model.
-Ensure the voice selection logic runs after voices are fully loaded (use the voiceschanged event for Web Speech API).
-The voice should sound natural, clear, and pleasant — not robotic or monotone.
+The payload ONLY contains { message: "summarize this page" }. It does NOT
+include the URL or title of the tab the user is currently viewing.
 
+The extension has access to Chrome APIs (chrome.tabs.query) that can retrieve
+the active tab's URL and title, but this data is NEVER fetched or sent.
 
-General Guidelines:
+─── FAILURE 2: Tab selection falls through to "create new tab" ─────────────────
 
-Do not break any existing functionality while applying these fixes.
-Ensure all fixes are cross-browser compatible (Chrome, Edge, Firefox).
-Add brief inline comments explaining each fix for future maintainability.
-Test each fix in isolation before combining them into the final solution.
+File: agent_server.py
+Function: select_automation_tab() → _find_relevant_tab()
+Lines: ~766-864
+
+The tab selection logic works by extracting DOMAIN KEYWORDS from the task text:
+    task = "summarize this page"
+    → No explicit URL found (no https?:// match)
+    → No keyword match in _DOMAIN_KEYWORDS (no "youtube", "gmail", etc.)
+    → target_domains = empty set
+    → _find_relevant_tab() returns None (line 788)
+
+Since no relevant tab is found, select_automation_tab() hits Rule 3:
+    "No relevant tab found — creating a new tab."
+    → Creates about:blank tab
+    → Agent attaches to blank tab → gets nothing to summarize
+
+Even if the tab selection somehow picks a tab, it picks based on domain
+keywords in the task text, NOT based on which tab the user is actually viewing.
+
+================================================================================
+THE FIX — TWO PARTS
+================================================================================
+
+─── PART 1: Extension sends current tab URL + title with every message ─────────
+
+File to modify: extension/sidebar.js
+Function to modify: sendMessage() inside initChat()
+
+BEFORE building the WebSocket payload, query the active Chrome tab:
+
+    // Get the active tab URL and title
+    let currentTabUrl = '';
+    let currentTabTitle = '';
+    try {
+        const [tab] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true        // ← IMPORTANT: same window the user is in
+        });
+        if (tab && tab.url) {
+            currentTabUrl = tab.url;
+            currentTabTitle = tab.title || '';
+        }
+    } catch (e) {
+        console.log('Could not get active tab:', e);
+    }
+
+Then include it in the payload:
+
+    const payload = {
+        message: message,
+        current_tab_url: currentTabUrl,
+        current_tab_title: currentTabTitle
+    };
+    if (imageData) { payload.image = imageData; }
+
+IMPORTANT: The sendMessage function must become `async function sendMessage()`
+(it already is async in the current code, so this is fine).
+
+IMPORTANT: The extension manifest.json must include the "activeTab" permission
+in the "permissions" array. Check if it's there; if not, add it:
+
+    "permissions": ["sidePanel", "storage", "identity", "activeTab"]
+
+ALSO: host_permissions already includes "http://localhost:8000/*" and
+"http://localhost:5005/*", but for querying ANY tab URL, the extension needs
+broad host permissions or the "tabs" permission. Add "tabs" to permissions:
+
+    "permissions": ["sidePanel", "storage", "identity", "activeTab", "tabs"]
+
+─── PART 2: Server uses current_tab_url for tab selection ──────────────────────
+
+File to modify: agent_server.py
+
+2A. Extract current_tab_url from the WebSocket message
+    In the WebSocket handler (websocket_chat function), after parsing
+    message_data, extract:
+
+        current_tab_url = message_data.get("current_tab_url", "")
+        current_tab_title = message_data.get("current_tab_title", "")
+
+    Pass current_tab_url to execute_automation_task() and then to
+    select_automation_tab().
+
+2B. Modify select_automation_tab() signature and logic
+    Change: async def select_automation_tab(task: str) -> str:
+    To:     async def select_automation_tab(task: str, current_tab_url: str = "") -> str:
+
+    Add a NEW Rule 0 — HIGHEST PRIORITY — before Rule 1 (new tab phrases):
+
+        # Rule 0 — If current_tab_url is provided AND the task references
+        # "this page"/"current page"/"this tab"/"this site", find and activate
+        # the tab matching that URL.
+        _CURRENT_PAGE_PHRASES = [
+            "this page", "current page", "this tab", "this site",
+            "this website", "the page", "the current",
+        ]
+
+        if current_tab_url and any(p in task.lower() for p in _CURRENT_PAGE_PHRASES):
+            valid_tabs = await _get_valid_browser_tabs()
+            for tab in valid_tabs:
+                if tab.get("url", "") == current_tab_url:
+                    print(f"📋 [TabSelect] Matched current tab by URL: {tab.get('url', '')[:70]}")
+                    await _activate_existing_tab(tab["id"])
+                    return tab["id"]
+            # Fallback: URL not found in CDP targets (unlikely) — continue
+            # to other rules
+
+    This ensures that when the user says "summarize this page" and the
+    extension sends current_tab_url="https://salmanfoods.com/...", the server
+    finds exactly that tab and activates it.
+
+2C. Modify execute_automation_task() to accept and forward current_tab_url
+    Change the function signature to include current_tab_url parameter.
+    Pass it through to select_automation_tab().
+
+2D. Modify the Automation tool function to accept and forward current_tab_url
+    The @function_tool Automation() callable needs to receive current_tab_url
+    from the calling context. Since tool functions are called by the OpenAI
+    Agent SDK, you cannot easily add parameters. Instead, store current_tab_url
+    in a global/context variable (similar to _current_automation_user):
+
+        _current_tab_url = ""
+
+    Set it before calling Runner.run_streamed() in the WebSocket handler.
+    Read it inside execute_automation_task().
+
+2E. Enrich the task prompt with the actual URL
+    In execute_automation_task(), after the select_automation_tab() call,
+    if current_tab_url is provided and the task mentions "this page", prepend
+    context to the processed_task:
+
+        if current_tab_url and any(p in processed_task.lower() for p in _CURRENT_PAGE_PHRASES):
+            processed_task = (
+                f"[CONTEXT: The user is currently viewing: {current_tab_url} "
+                f"(title: {current_tab_title}). "
+                f"Perform the following task on THIS specific page.]\n\n"
+                f"{processed_task}"
+            )
+
+    This gives the browser-use agent explicit URL context so it navigates to
+    the correct page even if tab selection had issues.
+
+================================================================================
+FILES TO MODIFY
+================================================================================
+
+1. extension/manifest.json
+   - Add "activeTab" and "tabs" to permissions array
+
+2. extension/sidebar.js
+   - In sendMessage(): query chrome.tabs for active tab, include URL + title
+     in the WebSocket payload
+   - Do NOT change anything else in sendMessage (image attach, typing
+     indicator, WebSocket state checks must remain identical)
+
+3. agent_server.py
+   - Add global _current_tab_url and _current_tab_title variables
+   - In websocket_chat(): extract current_tab_url and current_tab_title
+     from message_data, store in globals before running agent
+   - Modify select_automation_tab() to accept current_tab_url param,
+     add Rule 0 for "this page" matching
+   - Modify execute_automation_task() to accept and forward current_tab_url,
+     enrich prompt with URL context
+   - Add _CURRENT_PAGE_PHRASES constant near _NEW_TAB_PHRASES
+
+================================================================================
+IMPLEMENTATION ORDER
+================================================================================
+
+1. extension/manifest.json — add permissions (safest, no logic change)
+2. extension/sidebar.js — add tab query to sendMessage payload
+3. agent_server.py — add global vars, modify WebSocket handler
+4. agent_server.py — modify select_automation_tab with Rule 0
+5. agent_server.py — modify execute_automation_task with prompt enrichment
+
+================================================================================
+TESTING CHECKLIST
+================================================================================
+
+[ ] Open 4 tabs: YouTube, Gmail, SalmanFoods, Wikipedia
+[ ] Switch to SalmanFoods tab, open extension sidebar
+[ ] Type "summarize this page" → should summarize SalmanFoods (NOT YouTube)
+[ ] Type "extract all links from this page" → should extract from SalmanFoods
+[ ] Type "what is this page about" → should describe SalmanFoods
+[ ] Switch to YouTube tab, type "summarize this page" → should summarize YouTube
+[ ] Type "open Google in a new tab" → should still open a new tab (not reuse)
+[ ] Type "go to facebook" → should still use domain matching (existing behavior)
+[ ] Type a normal chat message "hello" → should work normally (no tab issues)
+[ ] Image attach + send still works
+[ ] TTS still works after response
+[ ] Stop/cancel automation still works
+[ ] Templates still work
+[ ] HITL input modals still work
+[ ] Scheduled tasks still run correctly
+[ ] Re-run from dashboard still works
+[ ] Extension login/logout still works
+[ ] No console errors in extension or server
+
+================================================================================
+WHAT NOT TO CHANGE
+================================================================================
+
+- WebSocket message format for: input_response, cancel, image_processing
+- Plan limit checking logic
+- Automation history recording
+- TTS functionality
+- Template definitions and behavior
+- Onboarding tour
+- Image attach/vision processing
+- Session/memory handling
+- MongoDB operations
+- Any CSS/HTML files
+- Login/logout flows
+
+================================================================================
+END OF PROMPT
+================================================================================

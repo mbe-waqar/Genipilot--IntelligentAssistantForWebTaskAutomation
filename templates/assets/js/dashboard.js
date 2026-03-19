@@ -112,6 +112,8 @@ async function fetchScheduledTasks() {
             allScheduledTasks = result.data;
             updateScheduledTasksList(allScheduledTasks);
             updateScheduledStatCard();
+            // Re-update pie chart with scheduled task data included
+            if (allHistory) updatePieChart(allHistory);
         }
     } catch (error) {
         console.error('Error fetching scheduled tasks:', error);
@@ -251,7 +253,7 @@ function createHistoryTableRow(task, fullView = false, taskId = null) {
     const statusText = task.status.charAt(0).toUpperCase() + task.status.slice(1);
 
     if (fullView) {
-        // Full view with ID column
+        // Full view with ID column and Re-run button
         row.innerHTML = `
             <td>#${String(taskId).padStart(3, '0')}</td>
             <td><strong>${escapeHtml(task.task_name)}</strong></td>
@@ -260,8 +262,8 @@ function createHistoryTableRow(task, fullView = false, taskId = null) {
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>${duration}</td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="showTaskDetails('${task._id}')">Details</button>
-                ${task.status === 'failed' ? `<button class="btn btn-sm btn-outline-secondary" onclick="retryTask('${task._id}')">Retry</button>` : ''}
+                <button class="btn btn-sm btn-outline-primary btn-details" onclick="showTaskDetails('${task._id}')">Details</button>
+                <button class="btn btn-sm btn-outline-primary btn-details" onclick="showRerunModal('${task._id}', '${escapeHtml(task.task_name).replace(/'/g, "\\'")}')"><i class="bi bi-arrow-clockwise"></i> Re-run</button>
             </td>
         `;
     } else {
@@ -271,7 +273,10 @@ function createHistoryTableRow(task, fullView = false, taskId = null) {
             <td>${formattedDate}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>${duration}</td>
-            <td><button class="btn btn-sm btn-outline-primary btn-details" onclick="showTaskDetails('${task._id}')">View</button></td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-details" onclick="showTaskDetails('${task._id}')">View</button>
+                <button class="btn btn-sm btn-outline-primary btn-details" onclick="showRerunModal('${task._id}', '${escapeHtml(task.task_name).replace(/'/g, "\\'")}')"><i class="bi bi-arrow-clockwise"></i> Re-run</button>
+            </td>
         `;
     }
 
@@ -297,14 +302,14 @@ function buildScheduledTaskCard(task, compact) {
         if (timeDiff > 0) {
             timeHtml = `
                 <div class="mt-2 px-2 py-1" style="background:#F0F7F6; border-left:3px solid #016B61; border-radius:4px; font-size:0.8rem;">
-                    <i class="bi bi-clock" style="color:#016B61;"></i> <strong>Next:</strong> ${nextRunDate.toLocaleString()}
+                    <i class="bi bi-clock" style="color:#016B61;"></i> <strong>Next:</strong> ${formatDateTime12(nextRunDate)}
                     &nbsp;<span class="countdown" data-next-run="${task.next_run}" style="color:#016B61; font-weight:600;">${formatTimeRemaining(timeDiff)}</span>
                 </div>`;
         } else {
             timeHtml = `<small class="text-muted d-block mt-1"><i class="bi bi-clock-history"></i> Running soon...</small>`;
         }
     } else if (task.last_run) {
-        timeHtml = `<small class="text-muted d-block mt-1"><i class="bi bi-check-circle"></i> Last run: ${new Date(task.last_run).toLocaleString()}</small>`;
+        timeHtml = `<small class="text-muted d-block mt-1"><i class="bi bi-check-circle"></i> Last run: ${formatDateTime12(task.last_run)}</small>`;
     }
 
     const card = document.createElement('div');
@@ -438,7 +443,7 @@ function updateLineChart(history) {
 function updatePieChart(history) {
     if (!window.pieChart) return;
 
-    // Count by status
+    // Count by status from automation history
     const statusCounts = {
         success: 0,
         failed: 0,
@@ -451,12 +456,29 @@ function updatePieChart(history) {
         }
     });
 
+    // Also include scheduled tasks in the counts
+    if (allScheduledTasks && allScheduledTasks.length > 0) {
+        allScheduledTasks.forEach(task => {
+            const execStatus = task.last_execution_status;
+            if (execStatus === 'success') {
+                statusCounts.success++;
+            } else if (execStatus === 'failed') {
+                statusCounts.failed++;
+            } else {
+                // null, undefined, 'pending', 'running' — count as pending
+                statusCounts.pending++;
+            }
+        });
+    }
+
     window.pieChart.data.labels = ['Success', 'Failed', 'Pending'];
     window.pieChart.data.datasets[0].data = [
         statusCounts.success,
         statusCounts.failed,
         statusCounts.pending
     ];
+    // Green shades matching dashboard palette
+    window.pieChart.data.datasets[0].backgroundColor = ['#016B61', '#70B2B2', '#9ECFD4'];
     window.pieChart.update();
 }
 
@@ -824,9 +846,8 @@ function displayTaskDetailsModal(task) {
     modal.show();
 }
 
-async function retryTask(taskId) {
-    // TODO: Implement retry functionality
-    alert('Retry functionality coming soon!');
+async function retryTask(taskId, taskName) {
+    showRerunModal(taskId, taskName || 'This task');
 }
 
 // ============================================================================
@@ -853,11 +874,11 @@ function showScheduledTaskDetails(taskId) {
                 : '<span class="badge bg-danger">Failed</span>')
         : '<span class="badge bg-secondary">Never Run</span>';
 
-    const lastRun = task.last_run ? new Date(task.last_run).toLocaleString() : 'Never';
-    const nextRun = task.next_run ? new Date(task.next_run).toLocaleString() : 'Not scheduled';
+    const lastRun = task.last_run ? formatDateTime12(task.last_run) : 'Never';
+    const nextRun = task.next_run ? formatDateTime12(task.next_run) : 'Not scheduled';
 
-    // Format schedule time for display
-    let scheduleDisplay = task.schedule_time || 'N/A';
+    // Format schedule time for display (convert 24h to 12h)
+    let scheduleDisplay = task.schedule_time ? formatTo12Hour(task.schedule_time) : 'N/A';
     const freq = (task.frequency || '').charAt(0).toUpperCase() + (task.frequency || '').slice(1);
 
     const modalTitle = document.getElementById('scheduledTaskDetailsModalLabel');
@@ -962,6 +983,25 @@ function formatTimeRemaining(milliseconds) {
     }
 }
 
+function formatTo12Hour(timeStr) {
+    // Converts "HH:MM" (24-hour) to "h:MM AM/PM"
+    if (!timeStr || !timeStr.includes(':')) return timeStr;
+    const [h, m] = timeStr.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+function formatDateTime12(dateInput) {
+    // Formats a Date object or date string to "Mar 18, 2026, 2:30 PM"
+    const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+    if (isNaN(d.getTime())) return String(dateInput);
+    return d.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true
+    });
+}
+
 function startCountdownTimers() {
     // Update all countdown timers every second
     const updateCountdowns = () => {
@@ -1042,18 +1082,18 @@ function getScheduleDescription(frequency, scheduleTime) {
                 const dateStr = `${parts[0]}-${parts[1]}-${parts[2]}`;
                 const timeStr = parts.slice(3).join('-');
                 const runDate = new Date(dateStr + 'T' + timeStr);
-                return `Runs once on ${runDate.toLocaleDateString()} at ${timeStr}`;
+                return `Runs once on ${runDate.toLocaleDateString()} at ${formatTo12Hour(timeStr)}`;
             }
-            return `Runs once at ${scheduleTime}`;
+            return `Runs once at ${formatTo12Hour(scheduleTime)}`;
         case 'daily':
-            return `Runs every day at ${scheduleTime}`;
+            return `Runs every day at ${formatTo12Hour(scheduleTime)}`;
         case 'weekly':
             const [day, weekTime] = scheduleTime.split('-');
             const dayNames = { MON: 'Monday', TUE: 'Tuesday', WED: 'Wednesday', THU: 'Thursday', FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday' };
-            return `Runs every ${dayNames[day] || day} at ${weekTime}`;
+            return `Runs every ${dayNames[day] || day} at ${formatTo12Hour(weekTime)}`;
         case 'monthly':
             const [dayNum, monthTime] = scheduleTime.split('-');
-            return `Runs on day ${dayNum} of each month at ${monthTime}`;
+            return `Runs on day ${dayNum} of each month at ${formatTo12Hour(monthTime)}`;
         case 'hourly':
             return `Runs every hour at minute ${scheduleTime}`;
         default:
@@ -1656,6 +1696,9 @@ async function initializeDashboard() {
         fetchUserSettings()
     ]);
 
+    // Fetch plan info after scheduled tasks are loaded (needs allScheduledTasks)
+    await fetchPlanInfo();
+
     console.log('✅ Dashboard data loaded');
 
     // Connect WebSocket for real-time notifications (after profile is loaded)
@@ -1672,6 +1715,8 @@ async function initializeDashboard() {
             fetchAutomationHistory(),
             fetchScheduledTasks()
         ]);
+        // Refresh plan info after scheduled tasks update
+        await fetchPlanInfo();
     }, 15000); // 15 seconds
 }
 
@@ -2297,4 +2342,537 @@ function escapeHtml(text) {
 function hideElement(id) {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
+}
+
+// ============================================================================
+// PRICING SECTION — Inline Pricing Management
+// ============================================================================
+
+let currentPlan = 'free'; // Default plan
+
+async function fetchPlanInfo() {
+    try {
+        // Include email as query param for reliable auth
+        let url = `${API_BASE_URL}/api/plan-info`;
+        if (currentUserEmail) {
+            url += `?email=${encodeURIComponent(currentUserEmail)}`;
+        }
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to fetch plan info');
+        const data = await response.json();
+        // API returns data directly: {plan, daily_tasks_used, daily_task_limit, max_scheduled_tasks, ...}
+        currentPlan = data.plan || 'free';
+        updatePricingUI(currentPlan);
+        updateUsageCard({
+            plan: data.plan || 'free',
+            tasks_today: data.daily_tasks_used || 0,
+            tasks_limit: data.daily_task_limit || 100,
+            scheduled_count: allScheduledTasks ? allScheduledTasks.length : 0,
+            scheduled_limit: data.max_scheduled_tasks || 25
+        });
+    } catch (error) {
+        console.error('Error fetching plan info:', error);
+        // Use defaults with allHistory count as fallback for tasks today
+        const todayStr = new Date().toDateString();
+        const todayTasks = allHistory ? allHistory.filter(t => new Date(t.start_time).toDateString() === todayStr).length : 0;
+        updatePricingUI('free');
+        updateUsageCard({
+            plan: 'free',
+            tasks_today: todayTasks,
+            tasks_limit: 100,
+            scheduled_count: allScheduledTasks ? allScheduledTasks.length : 0,
+            scheduled_limit: 25
+        });
+    }
+}
+
+function updatePricingUI(plan) {
+    currentPlan = plan;
+    const plans = ['free', 'pro', 'enterprise'];
+
+    plans.forEach(p => {
+        const btn = document.getElementById(`pricingBtn${p.charAt(0).toUpperCase() + p.slice(1)}`);
+        const card = document.querySelector(`.pricing-card[data-plan="${p}"]`);
+        if (!btn || !card) return;
+
+        card.classList.remove('pricing-card-active');
+
+        if (p === plan) {
+            card.classList.add('pricing-card-active');
+            btn.className = 'btn pricing-btn pricing-btn-current';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Current Plan';
+        } else {
+            btn.className = 'btn pricing-btn pricing-btn-upgrade';
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-arrow-up-circle"></i> ${p === 'free' ? 'Switch to Free' : 'Upgrade to ' + p.charAt(0).toUpperCase() + p.slice(1)}`;
+            btn.onclick = () => p === 'free' ? downgradePlan() : upgradePlan(p);
+        }
+    });
+
+    // Show/hide downgrade link
+    const downgradeLink = document.getElementById('downgradeLink');
+    if (downgradeLink) {
+        downgradeLink.style.display = plan !== 'free' ? 'inline-block' : 'none';
+    }
+
+    // Update subscription badge on overview stat card
+    const subValue = document.querySelector('.stat-card.purple .value');
+    if (subValue) {
+        subValue.textContent = plan.charAt(0).toUpperCase() + plan.slice(1) + ' Plan';
+    }
+
+    // Update profile badge
+    const profileBadge = document.querySelector('#profile-section .badge.bg-success');
+    if (profileBadge) {
+        profileBadge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1) + ' Plan';
+    }
+
+    // Update usage plan badge
+    const usageBadge = document.getElementById('usagePlanBadge');
+    if (usageBadge) {
+        usageBadge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1) + ' Plan';
+    }
+}
+
+async function upgradePlan(plan) {
+    // Redirect to website pricing page
+    window.location.href = '/pricing';
+    return;
+
+    // --- Original inline upgrade logic (kept for reference) ---
+    if (!confirm(`Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan?`)) return;
+
+    const btn = document.getElementById(`pricingBtn${plan.charAt(0).toUpperCase() + plan.slice(1)}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Upgrading...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/upgrade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ plan: plan })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showUpgradeSuccessAnimation(plan);
+            updatePricingUI(plan);
+            fetchPlanInfo(); // Refresh usage data
+            showToast(`Successfully upgraded to ${plan.charAt(0).toUpperCase() + plan.slice(1)}!`, 'success');
+        } else {
+            showToast(`Upgrade failed: ${result.error || 'Unknown error'}`, 'danger');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-arrow-up-circle"></i> Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`;
+            }
+        }
+    } catch (error) {
+        console.error('Error upgrading plan:', error);
+        showToast(`Error: ${error.message}`, 'danger');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-arrow-up-circle"></i> Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`;
+        }
+    }
+}
+
+async function downgradePlan() {
+    if (!confirm('Are you sure you want to downgrade to the Free plan? You may lose access to premium features.')) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/upgrade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ plan: 'free' })
+        });
+        const result = await response.json();
+        if (result.success) {
+            updatePricingUI('free');
+            fetchPlanInfo();
+            showToast('Downgraded to Free plan.', 'warning');
+        } else {
+            showToast(`Error: ${result.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error downgrading:', error);
+        showToast(`Error: ${error.message}`, 'danger');
+    }
+}
+
+function showUpgradeSuccessAnimation(plan) {
+    const card = document.querySelector(`.pricing-card[data-plan="${plan}"]`);
+    if (!card) return;
+
+    card.classList.add('pricing-upgrade-success');
+    setTimeout(() => card.classList.remove('pricing-upgrade-success'), 1500);
+}
+
+
+// ============================================================================
+// EXPORT FUNCTIONALITY
+// ============================================================================
+
+async function exportHistory(format) {
+    try {
+        // Include email as query param fallback in case session cookie auth fails
+        let url = `${API_BASE_URL}/api/history/export?format=${format}`;
+        if (currentUserEmail) {
+            url += `&email=${encodeURIComponent(currentUserEmail)}`;
+        }
+
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            // Try to parse error body for a better message
+            try {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Export failed');
+            } catch (parseErr) {
+                if (parseErr.message && parseErr.message !== 'Export failed') throw parseErr;
+                throw new Error(`Export failed (HTTP ${response.status})`);
+            }
+        }
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `automation-history.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+
+        showToast(`History exported as ${format.toUpperCase()}.`, 'success');
+    } catch (error) {
+        console.error('Error exporting history:', error);
+        showToast(`Export failed: ${error.message}`, 'danger');
+    }
+}
+
+// ============================================================================
+// USAGE CARD
+// ============================================================================
+
+function updateUsageCard(data) {
+    const tasksToday = data.tasks_today || 0;
+    const tasksLimit = data.tasks_limit || 100;
+    const scheduledCount = data.scheduled_count || (allScheduledTasks ? allScheduledTasks.length : 0);
+    const scheduledLimit = data.scheduled_limit || 25;
+
+    // Update plan badge
+    const planBadge = document.getElementById('usagePlanBadge');
+    if (planBadge) {
+        const planName = (data.plan || 'free').charAt(0).toUpperCase() + (data.plan || 'free').slice(1);
+        planBadge.textContent = `${planName} Plan`;
+    }
+
+    const tasksEl = document.getElementById('usageTasksToday');
+    if (tasksEl) tasksEl.textContent = `${tasksToday} / ${tasksLimit}`;
+
+    const tasksProgress = document.getElementById('usageTasksProgress');
+    if (tasksProgress) {
+        const pct = tasksLimit > 0 ? Math.min((tasksToday / tasksLimit) * 100, 100) : 0;
+        tasksProgress.style.width = pct + '%';
+        tasksProgress.classList.toggle('usage-progress-warning', pct >= 80);
+        tasksProgress.classList.toggle('usage-progress-danger', pct >= 100);
+    }
+
+    const scheduledEl = document.getElementById('usageScheduledTasks');
+    if (scheduledEl) scheduledEl.textContent = `${scheduledCount} / ${scheduledLimit}`;
+
+    const scheduledProgress = document.getElementById('usageScheduledProgress');
+    if (scheduledProgress) {
+        const pct = scheduledLimit > 0 ? Math.min((scheduledCount / scheduledLimit) * 100, 100) : 0;
+        scheduledProgress.style.width = pct + '%';
+        scheduledProgress.classList.toggle('usage-progress-warning', pct >= 80);
+        scheduledProgress.classList.toggle('usage-progress-danger', pct >= 100);
+    }
+}
+
+// ============================================================================
+// REAL-TIME DASHBOARD NOTIFICATIONS (Enhanced)
+// ============================================================================
+
+function connectNotificationWebSocket() {
+    if (!currentUserEmail) return;
+
+    const wsUrl = AGENT_SERVER_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+    const notifWs = new WebSocket(`${wsUrl}/ws/dashboard/${currentUserEmail}`);
+
+    notifWs.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'task_notification') {
+                showNotificationToast(data.message || 'Task update', data.status || 'info');
+                // Refresh history when task completes
+                if (data.status === 'success' || data.status === 'failed') {
+                    fetchAutomationHistory();
+                    fetchDashboardStats();
+                }
+            }
+        } catch (e) {
+            console.error('Notification WS parse error:', e);
+        }
+    };
+
+    notifWs.onclose = () => {
+        setTimeout(connectNotificationWebSocket, 10000);
+    };
+}
+
+function showNotificationToast(message, type) {
+    const container = document.getElementById('dashboardNotifToastContainer');
+    if (!container) return;
+
+    const colorMap = {
+        info: { bg: '#016B61', icon: 'bi-info-circle-fill' },
+        success: { bg: '#059669', icon: 'bi-check-circle-fill' },
+        failed: { bg: '#dc2626', icon: 'bi-exclamation-triangle-fill' },
+        danger: { bg: '#dc2626', icon: 'bi-exclamation-triangle-fill' },
+        warning: { bg: '#d97706', icon: 'bi-exclamation-circle-fill' }
+    };
+    const c = colorMap[type] || colorMap.info;
+
+    const toast = document.createElement('div');
+    toast.className = 'notif-toast notif-toast-show';
+    toast.innerHTML = `
+        <div class="notif-toast-icon" style="background: ${c.bg};">
+            <i class="bi ${c.icon}"></i>
+        </div>
+        <div class="notif-toast-content">
+            <div class="notif-toast-message">${message}</div>
+            <div class="notif-toast-time">Just now</div>
+        </div>
+        <button class="notif-toast-close" onclick="this.parentElement.remove()">
+            <i class="bi bi-x"></i>
+        </button>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        toast.classList.add('notif-toast-hide');
+        toast.addEventListener('animationend', () => toast.remove());
+    }, 5000);
+}
+
+// ============================================================================
+// TASK RE-RUN
+// ============================================================================
+
+let pendingRerunTaskId = null;
+
+function showRerunModal(taskId, taskName) {
+    pendingRerunTaskId = taskId;
+    const nameEl = document.getElementById('rerunTaskName');
+    if (nameEl) nameEl.textContent = taskName || 'This task';
+
+    const modal = new bootstrap.Modal(document.getElementById('rerunConfirmModal'));
+    modal.show();
+}
+
+async function confirmRerun() {
+    if (!pendingRerunTaskId) return;
+
+    const btn = document.getElementById('rerunConfirmBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Running...';
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/rerun`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ task_id: pendingRerunTaskId, email: currentUserEmail })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast('Task queued for re-run. Open the extension sidebar — it will auto-send.', 'success');
+            fetchAutomationHistory();
+        } else {
+            showToast(`Re-run failed: ${result.error}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error re-running task:', error);
+        showToast(`Error: ${error.message}`, 'danger');
+    }
+
+    // Close modal and reset
+    const modal = bootstrap.Modal.getInstance(document.getElementById('rerunConfirmModal'));
+    if (modal) modal.hide();
+    pendingRerunTaskId = null;
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-run';
+    }
+}
+
+// ============================================================================
+// ONBOARDING TOUR
+// ============================================================================
+
+const tourSteps = [
+    {
+        element: '#usageCardRow',
+        title: 'Usage Overview',
+        content: 'Track your daily task usage and scheduled task limits here. Upgrade your plan for higher limits.',
+        position: 'bottom'
+    },
+    {
+        element: '.table-container',
+        title: 'Task History',
+        content: 'View your recent automation tasks, their status, and duration. Click "View" for details or export your history.',
+        position: 'top'
+    }
+];
+
+let currentTourStep = 0;
+
+function initOnboardingTour() {
+    // Check if tour has been completed
+    if (localStorage.getItem('tour-completed') === 'true') return;
+
+    // Delay to let dashboard load
+    setTimeout(() => {
+        startTour();
+    }, 1500);
+}
+
+function startTour() {
+    currentTourStep = 0;
+    const overlay = document.getElementById('onboardingTourOverlay');
+    if (overlay) overlay.style.display = 'block';
+    showTourStep(currentTourStep);
+}
+
+function showTourStep(stepIndex) {
+    if (stepIndex >= tourSteps.length) {
+        completeTour();
+        return;
+    }
+
+    const step = tourSteps[stepIndex];
+    const targetEl = document.querySelector(step.element);
+    const tooltip = document.getElementById('tourTooltip');
+    const tooltipContent = document.getElementById('tourTooltipContent');
+    const stepIndicator = document.getElementById('tourStepIndicator');
+    const nextBtn = document.getElementById('tourNextBtn');
+
+    if (!targetEl || !tooltip) {
+        // Skip step if element not found
+        nextTourStep();
+        return;
+    }
+
+    // Update content
+    tooltipContent.innerHTML = `
+        <div class="tour-tooltip-title">${step.title}</div>
+        <div class="tour-tooltip-text">${step.content}</div>
+    `;
+    stepIndicator.textContent = `${stepIndex + 1} / ${tourSteps.length}`;
+    nextBtn.textContent = stepIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+
+    // Scroll target into view
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Position tooltip near target
+    setTimeout(() => {
+        const rect = targetEl.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+
+        // Highlight the target element
+        targetEl.classList.add('tour-highlight');
+
+        let top, left;
+        switch (step.position) {
+            case 'right':
+                top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+                left = rect.right + 16;
+                break;
+            case 'bottom':
+                top = rect.bottom + 16;
+                left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+                break;
+            case 'top':
+                top = rect.top - tooltipRect.height - 16;
+                left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+                break;
+            default:
+                top = rect.bottom + 16;
+                left = rect.left;
+        }
+
+        // Clamp to viewport
+        top = Math.max(10, Math.min(top, window.innerHeight - tooltipRect.height - 10));
+        left = Math.max(10, Math.min(left, window.innerWidth - tooltipRect.width - 10));
+
+        tooltip.style.top = top + 'px';
+        tooltip.style.left = left + 'px';
+        tooltip.style.opacity = '1';
+    }, 300);
+}
+
+function nextTourStep() {
+    // Remove highlight from current step
+    const currentStep = tourSteps[currentTourStep];
+    if (currentStep) {
+        const el = document.querySelector(currentStep.element);
+        if (el) el.classList.remove('tour-highlight');
+    }
+
+    currentTourStep++;
+    if (currentTourStep >= tourSteps.length) {
+        completeTour();
+    } else {
+        showTourStep(currentTourStep);
+    }
+}
+
+function skipTour() {
+    completeTour();
+}
+
+function completeTour() {
+    // Remove all highlights
+    document.querySelectorAll('.tour-highlight').forEach(el => {
+        el.classList.remove('tour-highlight');
+    });
+
+    const overlay = document.getElementById('onboardingTourOverlay');
+    if (overlay) overlay.style.display = 'none';
+
+    localStorage.setItem('tour-completed', 'true');
+}
+
+// ============================================================================
+// ENHANCED INITIALIZATION — Hook new features after existing init completes
+// ============================================================================
+
+function initNewDashboardFeatures() {
+    // Fetch plan info for pricing + usage card
+    fetchPlanInfo();
+
+    // Onboarding tour removed
+}
+
+// Wait for DOM and then initialize new features after a short delay
+// (ensures the original initializeDashboard has completed)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initNewDashboardFeatures, 500);
+    });
+} else {
+    setTimeout(initNewDashboardFeatures, 500);
 }

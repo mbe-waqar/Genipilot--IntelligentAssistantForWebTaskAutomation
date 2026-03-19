@@ -31,6 +31,12 @@ from models import AutomationHistoryDB, AutomationHistory, TaskStatus, get_datab
 # Task scheduler
 from task_scheduler import initialize_scheduler, shutdown_scheduler, get_scheduler
 
+# Vision module (standalone — image-to-automation)
+from vision_module import create_vision_processor
+
+# Plan module (standalone — subscription/feature gating)
+from plan_module import check_task_limit, check_image_access, increment_task_count, get_user_plan_info
+
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -327,8 +333,18 @@ root_logger.addHandler(websocket_log_handler)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle startup and shutdown events"""
+    global vision_processor
+
     # Startup
     print("🚀 Starting agent server...")
+
+    # Initialize vision processor (standalone module)
+    vision_processor = create_vision_processor()
+    if vision_processor:
+        print("✅ Vision module initialized")
+    else:
+        print("⚠️ Vision module disabled (OPENAI_API_KEY not set or missing)")
+
     try:
         # Clean up any orphaned tasks from previous sessions
         await cleanup_orphaned_tasks()
@@ -591,6 +607,9 @@ dashboard_websockets = {}
 # Format: {user_email: bool}
 cancellation_flags = {}
 
+# Vision processor instance (initialized in lifespan)
+vision_processor = None
+
 # Store currently running task IDs per user
 # Format: {user_email: history_id}
 running_tasks = {}
@@ -610,6 +629,9 @@ class ChatRequest(BaseModel):
 
 # Global variable to store current user email for automation context
 _current_automation_user = None
+# Global variables to store current tab URL/title from extension
+_current_tab_url = ""
+_current_tab_title = ""
 
 
 async def inject_logo_script_on_all_pages(browser_instance):
@@ -709,6 +731,12 @@ _DOMAIN_KEYWORDS = {
 _NEW_TAB_PHRASES = [
     "new tab", "in a new tab", "open new tab", "open a new tab",
     "new window", "in a new window",
+]
+
+# Phrases that signal the task refers to the user's current page/tab.
+_CURRENT_PAGE_PHRASES = [
+    "this page", "current page", "this tab", "this site",
+    "this website", "the page", "the current",
 ]
 
 
@@ -811,19 +839,34 @@ async def _create_new_browser_tab() -> str:
     return None
 
 
-async def select_automation_tab(task: str) -> str:
+async def select_automation_tab(task: str, current_tab_url: str = "") -> str:
     """
     Select the correct Chrome tab for the automation task and activate it.
 
     Rules (in priority order):
+      0. Task references "this page"/"current page" AND current_tab_url provided
+         → find and activate that exact tab.
       1. Task explicitly says "new tab" → force-create a new tab.
       2. A relevant tab matching the task domain is already open → reuse it.
       3. No relevant tab found → create a new tab.
 
     Returns the CDP targetId of the selected tab, or None on failure.
     """
+    task_lower = task.lower()
+
+    # Rule 0 — match current tab URL when user references "this page" / "current page".
+    if current_tab_url and any(p in task_lower for p in _CURRENT_PAGE_PHRASES):
+        valid_tabs = await _get_valid_browser_tabs()
+        for tab in valid_tabs:
+            if tab.get("url", "") == current_tab_url:
+                print(f"📋 [TabSelect] Matched current tab by URL: {tab.get('url', '')[:70]}")
+                await _activate_existing_tab(tab["id"])
+                return tab["id"]
+        # Fallback: URL not found in CDP targets — continue to other rules
+        print(f"📋 [TabSelect] current_tab_url not found in CDP targets, falling through.")
+
     # Rule 1 — force new tab when explicitly requested.
-    if any(phrase in task.lower() for phrase in _NEW_TAB_PHRASES):
+    if any(phrase in task_lower for phrase in _NEW_TAB_PHRASES):
         print("📋 [TabSelect] Task requests a new tab — force-creating one.")
         return await _create_new_browser_tab()
 
@@ -918,13 +961,24 @@ async def execute_automation_task(task: str, user_email: str = None) -> str:
 
     # ── LAYER 1: Select the correct Chrome tab BEFORE creating the agent ───────
     # This ensures the browser agent never attaches to the extension UI.
-    chosen_target_id = await select_automation_tab(task)
+    # Use global current tab URL from extension for "this page" matching.
+    global _current_tab_url, _current_tab_title
+    chosen_target_id = await select_automation_tab(task, current_tab_url=_current_tab_url)
     if chosen_target_id:
         print(f"✅ [TabSelect] Tab ready for automation: {chosen_target_id}")
         # Give Chrome 800 ms to register the activation / creation event.
         await asyncio.sleep(0.8)
     else:
         print("⚠️ [TabSelect] Tab selection failed — browser-use will use its default.")
+
+    # ── Enrich task with current tab context for "this page" commands ─────────
+    if _current_tab_url and any(p in processed_task.lower() for p in _CURRENT_PAGE_PHRASES):
+        processed_task = (
+            f"[CONTEXT: The user is currently viewing: {_current_tab_url} "
+            f"(title: {_current_tab_title}). "
+            f"Perform the following task on THIS specific page.]\n\n"
+            f"{processed_task}"
+        )
 
     # ── LAYER 3: Prepend safety rules to the task prompt ─────────────────────
     # Tab safety: self-correct if the agent lands on an extension page.
@@ -1147,31 +1201,90 @@ async def execute_automation_task(task: str, user_email: str = None) -> str:
                     elif all_errors:
                         print(f"🚨 Error alert email SKIPPED (error_alerts=False, errors={len(all_errors)})")
 
+                    # 4. Dashboard WebSocket: push real-time notification
+                    dash_ws = dashboard_websockets.get(actual_user_email)
+                    if dash_ws:
+                        try:
+                            await safe_send_json(dash_ws, {
+                                "type": "task_completed",
+                                "task_name": task_name_short,
+                                "status": status_str,
+                                "duration": duration_str,
+                                "timestamp": datetime.now().isoformat()
+                            })
+                            print(f"📊 Dashboard notification sent")
+                        except Exception:
+                            pass
+
                 except Exception as notif_error:
                     print(f"⚠️ Error sending notifications: {notif_error}")
 
             except Exception as e:
                 print(f"⚠️ Could not update automation history: {e}")
 
-    # Build result summary
-    if history:
-        result_summary = f"Task completed successfully!\n\n"
-        result_summary += f"Final result: {history.final_result()}\n"
-        result_summary += f"Steps executed: {history.number_of_steps()}\n"
-        result_summary += f"Duration: {duration:.1f}s\n"
+    # Build structured result summary based on actual execution state
+    # This ensures the orchestrator LLM cannot hallucinate success
+    status_label = final_status.value if hasattr(final_status, 'value') else str(final_status)
 
-        if history.urls():
+    if final_status == TaskStatus.CANCELED:
+        result_summary = f"[EXECUTION STATUS: CANCELLED]\n"
+        result_summary += f"The task was cancelled before completion.\n\n"
+        if history:
+            result_summary += f"Browser agent output before cancellation: {history.final_result()}\n"
+            result_summary += f"Steps executed before cancellation: {history.number_of_steps()}\n"
+        result_summary += f"Duration: {duration:.1f}s\n"
+        if error_list:
+            result_summary += f"\nReasons:\n"
+            for error in error_list:
+                result_summary += f"  - {error}\n"
+        if history and history.urls():
+            result_summary += f"\nURLs visited (partial):\n"
+            for url in history.urls()[:3]:
+                result_summary += f"  - {url}\n"
+        result_summary += f"\nIMPORTANT: The task was NOT completed. Only report what was actually done. Do NOT claim any action succeeded unless it is listed above as completed."
+
+    elif final_status == TaskStatus.FAILED:
+        result_summary = f"[EXECUTION STATUS: FAILED]\n"
+        result_summary += f"The task failed during execution.\n\n"
+        if history:
+            result_summary += f"Browser agent output: {history.final_result()}\n"
+            result_summary += f"Steps attempted: {history.number_of_steps()}\n"
+        result_summary += f"Duration: {duration:.1f}s\n"
+        all_reported_errors = error_list + ([e for e in (history.errors() if history else []) if e])
+        if all_reported_errors:
+            result_summary += f"\nErrors:\n"
+            for error in all_reported_errors:
+                result_summary += f"  - {error}\n"
+        if history and history.urls():
             result_summary += f"\nURLs visited:\n"
             for url in history.urls()[:3]:
                 result_summary += f"  - {url}\n"
+        result_summary += f"\nIMPORTANT: The task FAILED. Do NOT report success. Explain what went wrong based on the errors above."
 
-        if history.errors():
-            result_summary += f"\nErrors encountered:\n"
+    elif final_status == TaskStatus.SUCCESS:
+        result_summary = f"[EXECUTION STATUS: SUCCESS]\n"
+        result_summary += f"The task completed successfully.\n\n"
+        if history:
+            result_summary += f"Final result: {history.final_result()}\n"
+            result_summary += f"Steps executed: {history.number_of_steps()}\n"
+        result_summary += f"Duration: {duration:.1f}s\n"
+        if history and history.urls():
+            result_summary += f"\nURLs visited:\n"
+            for url in history.urls()[:3]:
+                result_summary += f"  - {url}\n"
+        if history and history.errors():
+            result_summary += f"\nWarnings/errors during execution:\n"
             for error in history.errors():
                 if error:
                     result_summary += f"  - {error}\n"
+
     else:
-        result_summary = f"Task failed after {duration:.1f}s\n"
+        # Unknown status — treat conservatively
+        result_summary = f"[EXECUTION STATUS: {status_label}]\n"
+        result_summary += f"Duration: {duration:.1f}s\n"
+        if history:
+            result_summary += f"Browser agent output: {history.final_result()}\n"
+            result_summary += f"Steps: {history.number_of_steps()}\n"
         if error_list:
             result_summary += f"\nErrors:\n"
             for error in error_list:
@@ -1216,7 +1329,28 @@ You have access to browser automation that can:
 - Take screenshots
 - And much more
 
-Always be helpful and proactive in using your automation capabilities.""",
+Always be helpful and proactive in using your automation capabilities.
+
+[CRITICAL RESPONSE RULES — YOU MUST FOLLOW THESE]
+When you receive results from the Automation tool, your response MUST be based STRICTLY on the execution status reported:
+
+1. If the result says [EXECUTION STATUS: CANCELLED]:
+   - NEVER claim the task was completed successfully
+   - Clearly state which actions were done and which were NOT completed
+   - Explain why the task was cancelled (e.g., user cancelled, login required, timeout)
+   - Example: "I opened Instagram, but the like action was not completed because the task was cancelled."
+
+2. If the result says [EXECUTION STATUS: FAILED]:
+   - NEVER claim the task succeeded
+   - Explain what went wrong based on the errors provided
+   - Mention any partial progress that was made
+
+3. If the result says [EXECUTION STATUS: SUCCESS]:
+   - You may report success, but only for actions confirmed in the result
+   - Do NOT assume additional actions were completed beyond what is reported
+
+4. NEVER fabricate, assume, or hallucinate outcomes. Only report what the execution result explicitly confirms.
+5. If login was required and the user did not provide credentials, state that clearly.""",
         tools=[Automation],
     )
     return agent
@@ -1360,11 +1494,75 @@ async def websocket_chat(websocket: WebSocket, user_email: str):
                 continue
 
             # Set global user email for automation context
-            global _current_automation_user
+            global _current_automation_user, _current_tab_url, _current_tab_title
             _current_automation_user = user_email
+
+            # Extract current tab URL/title from extension (for "this page" commands)
+            _current_tab_url = message_data.get("current_tab_url", "")
+            _current_tab_title = message_data.get("current_tab_title", "")
 
             # Reset cancellation flag for this user
             cancellation_flags[user_email] = False
+
+            # ── PLAN CHECK — verify task limit before proceeding ──────────
+            try:
+                limit_check = await check_task_limit(user_email)
+                if not limit_check["allowed"]:
+                    await safe_send_json(websocket, {
+                        "type": "plan_limit",
+                        "message": limit_check["message"],
+                        "current_plan": limit_check["plan"],
+                        "daily_limit": limit_check["daily_limit"],
+                        "daily_used": limit_check["daily_used"],
+                        "upgrade_url": "/dashboard#pricing",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    continue  # Don't process — limit reached
+            except Exception as plan_err:
+                print(f"⚠️ Plan check failed (allowing task): {plan_err}")
+
+            # ── IMAGE PROCESSING — extract context if image attached ──────
+            image_data = message_data.get("image")
+            image_thumbnail = None
+            if image_data and vision_processor:
+                # Check if user's plan allows image module
+                try:
+                    img_access = await check_image_access(user_email)
+                    if not img_access["allowed"]:
+                        await safe_send_json(websocket, {
+                            "type": "plan_limit",
+                            "message": img_access["message"],
+                            "current_plan": img_access["plan"],
+                            "upgrade_url": "/dashboard#pricing",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        continue
+                except Exception:
+                    pass  # Allow if plan check fails
+
+                await safe_send_json(websocket, {
+                    "type": "image_processing",
+                    "message": "Analyzing your image...",
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                try:
+                    vision_result = await vision_processor.extract_context(image_data, user_message)
+                    if vision_result.success:
+                        user_message = vision_result.enriched_prompt
+                        image_thumbnail = vision_result.thumbnail_base64
+                        print(f"✅ Vision module enriched prompt: {user_message[:100]}...")
+                    else:
+                        print(f"⚠️ Vision extraction failed: {vision_result.error}")
+                        # Fallback: continue with text-only query
+                except Exception as vis_err:
+                    print(f"⚠️ Vision processing error (continuing with text): {vis_err}")
+
+            # ── INCREMENT TASK COUNT ──────────────────────────────────────
+            try:
+                await increment_task_count(user_email)
+            except Exception:
+                pass  # Don't block on counter failure
 
             # Create orchestrator agent
             agent = create_orchestrator_agent()
@@ -1965,6 +2163,58 @@ async def handle_voice_command(request: Request):
     except Exception as e:
         print(f"Error handling voice command: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ── Plan Info Endpoint ──────────────────────────────────────────────────────
+@app.get("/api/plan-info")
+async def api_plan_info(request: Request, email: str = None):
+    """Get current plan info for a user (used by extension and dashboard)."""
+    user_email = email
+    if not user_email:
+        return JSONResponse(status_code=400, content={"error": "email parameter required"})
+
+    try:
+        info = await get_user_plan_info(user_email)
+        return JSONResponse(content=info)
+    except Exception as e:
+        print(f"Error fetching plan info: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ── Dashboard WebSocket ────────────────────────────────────────────────────
+@app.websocket("/ws/dashboard/{user_email}")
+async def websocket_dashboard(websocket: WebSocket, user_email: str):
+    """WebSocket for real-time dashboard notifications (task completion, usage updates)."""
+    await websocket.accept()
+
+    # Register dashboard WebSocket
+    old_ws = dashboard_websockets.get(user_email)
+    if old_ws and old_ws != websocket:
+        try:
+            await old_ws.close()
+        except Exception:
+            pass
+
+    dashboard_websockets[user_email] = websocket
+    print(f"Dashboard WebSocket connected for {user_email}")
+
+    try:
+        while True:
+            # Keep connection alive — listen for pings or messages
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+
+            # Handle ping/pong for keepalive
+            if msg.get("type") == "ping":
+                await safe_send_json(websocket, {"type": "pong"})
+
+    except WebSocketDisconnect:
+        print(f"Dashboard WebSocket disconnected for {user_email}")
+    except Exception as e:
+        print(f"Dashboard WebSocket error for {user_email}: {e}")
+    finally:
+        if dashboard_websockets.get(user_email) == websocket:
+            del dashboard_websockets[user_email]
 
 
 async def cleanup_orphaned_tasks():

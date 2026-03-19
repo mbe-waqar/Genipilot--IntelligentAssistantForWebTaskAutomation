@@ -39,6 +39,17 @@
     <!-- Composer Bar -->
     <div class="composer-bar">
 
+      <!-- Image Preview (shown when image is attached) -->
+      <div id="imagePreview" class="image-preview" style="display: none;">
+        <img id="imagePreviewImg" src="" alt="Attached image">
+        <button id="removeImageBtn" class="remove-image-btn" title="Remove image" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
       <div class="composer-container">
         <!-- Multi-line input -->
         <textarea
@@ -52,6 +63,38 @@
 
         <!-- Action Buttons -->
         <div class="composer-actions">
+          <!-- Templates Button -->
+          <button
+            id="templatesBtn"
+            class="templates-btn"
+            aria-label="Quick templates"
+            title="Quick automation templates"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+            </svg>
+          </button>
+
+          <!-- Image Attach Button -->
+          <button
+            id="imageAttachBtn"
+            class="image-attach-btn"
+            aria-label="Attach image"
+            title="Attach an image (Ctrl+V to paste)"
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+          </button>
+          <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
+
           <!-- Stop Button (hidden by default, shown during automation) -->
           <button
             id="stopBtn"
@@ -99,6 +142,9 @@
           </button>
         </div>
       </div>
+
+      <!-- Templates Panel (hidden by default) -->
+      <div id="templatesPanel" class="templates-panel" style="display: none;"></div>
 
       <!-- Status/Notification Area -->
       <div id="statusToast" class="status-toast" role="status" aria-live="polite"></div>

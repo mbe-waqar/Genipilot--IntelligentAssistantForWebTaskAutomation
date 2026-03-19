@@ -294,6 +294,14 @@ function handleWebSocketMessage(data) {
       console.log('🔔 Handling task_notification');
       showStatusToast(data.message || 'Task update', data.status === 'success' ? 'success' : 'warning');
       break;
+    case 'plan_limit':
+      console.log('Plan limit reached:', data);
+      handlePlanLimit(data);
+      break;
+    case 'image_processing':
+      console.log('Image processing:', data);
+      showStatusToast(data.message || 'Processing image...', 'info');
+      break;
     case 'debug':
       console.log('Debug event:', data);
       break;
@@ -1026,6 +1034,36 @@ function updateTaskSummary() {
   summaryElement.textContent = `${currentTaskSteps.length} steps completed...`;
 }
 
+// Check for pending re-run task from dashboard (backend relay)
+let _pendingRerunChecking = false;
+async function checkPendingRerun(messageInput, sendMessageFn) {
+  if (_pendingRerunChecking || isAutomationRunning) return;
+  _pendingRerunChecking = true;
+  try {
+    const user = await chrome.storage.local.get(['userEmail']);
+    if (!user.userEmail) return;
+    const resp = await fetch(`${API_BASE_URL}/api/pending-rerun?email=${encodeURIComponent(user.userEmail)}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.pending && data.task_description) {
+      // Populate input and auto-send
+      messageInput.value = data.task_description;
+      messageInput.style.height = 'auto';
+      messageInput.style.height = messageInput.scrollHeight + 'px';
+      // Auto-send after a brief delay so WebSocket is ready
+      setTimeout(() => {
+        if (messageInput.value.trim()) {
+          sendMessageFn();
+        }
+      }, 500);
+    }
+  } catch (e) {
+    // Silently ignore — network errors are expected when server is down
+  } finally {
+    _pendingRerunChecking = false;
+  }
+}
+
 // Initialize chat functionality
 function initChat() {
   const messageInput = document.getElementById('messageInput');
@@ -1037,12 +1075,15 @@ function initChat() {
     const message = messageInput.value.trim();
     if (!message) return;
 
-    // Add user message to chat
-    addMessageToChat('user', message);
+    // Add user message to chat (with image thumbnail if attached)
+    const attachedImage = _getAttachedImage();
+    addMessageToChat('user', message, attachedImage ? attachedImage.thumbnail : null);
 
-    // Clear input
+    // Clear input and image
     messageInput.value = '';
     messageInput.style.height = 'auto';
+    const imageData = attachedImage ? attachedImage.full : null;
+    _clearAttachedImage();
 
     // Show typing indicator
     showTypingIndicator();
@@ -1075,9 +1116,33 @@ function initChat() {
     }
 
     try {
+      // Get the active tab URL and title for "this page" context
+      let currentTabUrl = '';
+      let currentTabTitle = '';
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab && tab.url) {
+          currentTabUrl = tab.url;
+          currentTabTitle = tab.title || '';
+        }
+      } catch (e) {
+        console.log('Could not get active tab:', e);
+      }
+
+      // Build payload — include image and current tab info if available
+      const payload = { message: message };
+      if (currentTabUrl) {
+        payload.current_tab_url = currentTabUrl;
+        payload.current_tab_title = currentTabTitle;
+      }
+      if (imageData) {
+        payload.image = imageData;
+        console.log('Sending message with image attachment');
+      }
+
       // Send message via WebSocket
       console.log('Sending message via WebSocket:', message);
-      websocket.send(JSON.stringify({ message: message }));
+      websocket.send(JSON.stringify(payload));
       console.log('Message sent successfully');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -1106,10 +1171,21 @@ function initChat() {
     messageInput.style.height = messageInput.scrollHeight + 'px';
   });
 
+  // Check for pending re-run tasks from dashboard (via backend relay)
+  checkPendingRerun(messageInput, sendMessage);
+
+  // Poll for pending re-run tasks periodically and on sidebar focus
+  setInterval(() => checkPendingRerun(messageInput, sendMessage), 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      checkPendingRerun(messageInput, sendMessage);
+    }
+  });
+
 }
 
-// Add message to chat
-function addMessageToChat(role, content) {
+// Add message to chat (optional imageSrc for image thumbnail display)
+function addMessageToChat(role, content, imageSrc) {
   const chatArea = document.getElementById('chatArea');
 
   // Remove welcome message if it exists
@@ -1150,7 +1226,26 @@ function addMessageToChat(role, content) {
 
   const contentDiv = document.createElement('div');
   contentDiv.className = 'message-content';
-  contentDiv.textContent = content;
+
+  // Show image thumbnail if provided
+  if (imageSrc) {
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.className = 'message-image-thumb';
+    img.alt = 'Attached image';
+    img.addEventListener('click', () => {
+      const lightbox = document.createElement('div');
+      lightbox.className = 'image-lightbox';
+      lightbox.innerHTML = `<img src="${imageSrc}" alt="Full image">`;
+      lightbox.addEventListener('click', () => lightbox.remove());
+      document.body.appendChild(lightbox);
+    });
+    contentDiv.appendChild(img);
+  }
+
+  const textNode = document.createElement('div');
+  textNode.textContent = content;
+  contentDiv.appendChild(textNode);
 
   messageDiv.appendChild(avatar);
   messageDiv.appendChild(contentDiv);
@@ -1357,6 +1452,352 @@ function updateSpeakerIcon() {
   }
 }
 
+// ========================================
+// IMAGE ATTACH MODULE
+// ========================================
+
+let _attachedImageData = null; // { full: dataURI, thumbnail: dataURI }
+
+function _getAttachedImage() {
+  return _attachedImageData;
+}
+
+function _clearAttachedImage() {
+  _attachedImageData = null;
+  const preview = document.getElementById('imagePreview');
+  const btn = document.getElementById('imageAttachBtn');
+  if (preview) preview.style.display = 'none';
+  if (btn) btn.classList.remove('has-image');
+}
+
+function _showImagePreview(dataURI) {
+  const preview = document.getElementById('imagePreview');
+  const img = document.getElementById('imagePreviewImg');
+  const btn = document.getElementById('imageAttachBtn');
+  if (preview && img) {
+    img.src = dataURI;
+    preview.style.display = 'flex';
+  }
+  if (btn) btn.classList.add('has-image');
+}
+
+function _handleImageFile(file) {
+  if (!file) return;
+
+  // Validate type
+  const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    showStatusToast('Unsupported image format. Use PNG, JPEG, or WebP.', 'error');
+    return;
+  }
+
+  // Validate size (5MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    showStatusToast('Image too large. Maximum size is 5MB.', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataURI = e.target.result;
+    _attachedImageData = { full: dataURI, thumbnail: dataURI };
+    _showImagePreview(dataURI);
+  };
+  reader.readAsDataURL(file);
+}
+
+function initImageAttach() {
+  const attachBtn = document.getElementById('imageAttachBtn');
+  const fileInput = document.getElementById('imageFileInput');
+  const removeBtn = document.getElementById('removeImageBtn');
+  const chatArea = document.getElementById('chatArea');
+
+  if (!attachBtn || !fileInput) return;
+
+  // Click attach button -> open file picker
+  attachBtn.addEventListener('click', () => fileInput.click());
+
+  // File selected
+  fileInput.addEventListener('change', (e) => {
+    _handleImageFile(e.target.files[0]);
+    fileInput.value = ''; // Reset so same file can be re-selected
+  });
+
+  // Remove image
+  if (removeBtn) {
+    removeBtn.addEventListener('click', _clearAttachedImage);
+  }
+
+  // Paste from clipboard (Ctrl+V)
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        _handleImageFile(item.getAsFile());
+        return;
+      }
+    }
+  });
+
+  // Drag and drop
+  if (chatArea) {
+    chatArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      chatArea.style.outline = '2px dashed var(--color-primary)';
+    });
+    chatArea.addEventListener('dragleave', () => {
+      chatArea.style.outline = '';
+    });
+    chatArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      chatArea.style.outline = '';
+      const file = e.dataTransfer?.files[0];
+      if (file && file.type.startsWith('image/')) {
+        _handleImageFile(file);
+      }
+    });
+  }
+}
+
+// ========================================
+// TEMPLATES MODULE
+// ========================================
+
+const AUTOMATION_TEMPLATES = [
+  { icon: "&#x2709;", name: "Check my emails", desc: "Open Gmail and summarize unread", prompt: "Open Gmail and summarize my unread emails", premium: false },
+  { icon: "&#x1F4F0;", name: "What's trending?", desc: "See trending topics on X/Twitter", prompt: "Open Twitter and tell me what's trending right now", premium: false },
+  { icon: "&#x1F4C5;", name: "Check my calendar", desc: "Open Google Calendar events", prompt: "Open Google Calendar and show me today's events", premium: false },
+  { icon: "&#x1F4DD;", name: "Summarize this page", desc: "Extract and summarize page content", prompt: "Summarize the content of the current page", premium: false },
+  { icon: "&#x2708;", name: "Find cheapest flight", desc: "Search Google Flights for deals", prompt: "Open Google Flights and find the cheapest flight", premium: true },
+  { icon: "&#x1F4E6;", name: "Track package", desc: "Open tracking page for your order", prompt: "Track my package", premium: true },
+  { icon: "&#x1F6D2;", name: "Compare prices", desc: "Find product across shopping sites", prompt: "Compare prices for this product across Amazon and other sites", premium: true },
+  { icon: "&#x1F4CA;", name: "Stock prices", desc: "Check current stock market prices", prompt: "Open Google Finance and show me today's market summary", premium: false },
+];
+
+function initTemplates() {
+  const templatesBtn = document.getElementById('templatesBtn');
+  const templatesPanel = document.getElementById('templatesPanel');
+  if (!templatesBtn || !templatesPanel) return;
+
+  // Build the templates panel content
+  function renderTemplates() {
+    let html = '<div class="templates-panel-title">Quick Actions</div>';
+    AUTOMATION_TEMPLATES.forEach((t, i) => {
+      html += `
+        <div class="template-item" data-index="${i}">
+          <span class="template-icon">${t.icon}</span>
+          <div class="template-info">
+            <div class="template-name">${t.name}</div>
+            <div class="template-desc">${t.desc}</div>
+          </div>
+          ${t.premium ? '<span class="template-badge">PRO</span>' : ''}
+        </div>`;
+    });
+    templatesPanel.innerHTML = html;
+
+    // Attach click handlers
+    templatesPanel.querySelectorAll('.template-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const idx = parseInt(item.dataset.index);
+        const template = AUTOMATION_TEMPLATES[idx];
+        const input = document.getElementById('messageInput');
+        if (input) {
+          input.value = template.prompt;
+          input.focus();
+          input.style.height = 'auto';
+          input.style.height = input.scrollHeight + 'px';
+        }
+        templatesPanel.style.display = 'none';
+      });
+    });
+  }
+
+  renderTemplates();
+
+  // Toggle panel
+  templatesBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isVisible = templatesPanel.style.display !== 'none';
+    templatesPanel.style.display = isVisible ? 'none' : 'block';
+  });
+
+  // Close panel on outside click
+  document.addEventListener('click', (e) => {
+    if (!templatesPanel.contains(e.target) && e.target !== templatesBtn) {
+      templatesPanel.style.display = 'none';
+    }
+  });
+}
+
+// ========================================
+// PLAN BADGE MODULE
+// ========================================
+
+async function initPlanBadge() {
+  try {
+    const user = await chrome.storage.local.get(['userEmail']);
+    if (!user.userEmail) return;
+
+    const response = await fetch(`${API_BASE_URL}/api/plan-info?email=${encodeURIComponent(user.userEmail)}`);
+    if (!response.ok) return;
+
+    const planInfo = await response.json();
+    const header = document.querySelector('.panel-header');
+    if (!header) return;
+
+    // Remove old badge if exists
+    const oldBadge = header.querySelector('.plan-badge');
+    if (oldBadge) oldBadge.remove();
+
+    const badge = document.createElement('span');
+    badge.className = `plan-badge ${planInfo.plan || 'free'}`;
+    badge.textContent = (planInfo.display_name || 'Free').toUpperCase();
+
+    const title = header.querySelector('.panel-title');
+    if (title) {
+      title.appendChild(badge);
+    }
+  } catch (e) {
+    console.log('Could not load plan badge:', e.message);
+  }
+}
+
+// ========================================
+// PLAN LIMIT HANDLER
+// ========================================
+
+function handlePlanLimit(data) {
+  removeTypingIndicator();
+
+  const chatArea = document.getElementById('chatArea');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'message assistant-message';
+
+  msgDiv.innerHTML = `
+    <div class="message-content">
+      <div class="plan-limit-message">
+        <strong>${data.message || 'Daily task limit reached.'}</strong>
+        <a class="upgrade-link" href="${data.upgrade_url || '#'}" target="_blank">Upgrade your plan</a>
+      </div>
+    </div>
+  `;
+
+  chatArea.appendChild(msgDiv);
+  chatArea.scrollTop = chatArea.scrollHeight;
+
+  // Reset automation state
+  isAutomationRunning = false;
+  updateStopButtonVisibility();
+}
+
+// ========================================
+// ONBOARDING TOUR (Extension)
+// ========================================
+
+function initOnboardingTour() {
+  const tourKey = 'genipilot-tour-completed';
+  if (localStorage.getItem(tourKey)) return;
+
+  const steps = [
+    { target: '#messageInput', text: 'Type any automation task here — like "open YouTube and play a song"', position: 'top' },
+    { target: '#imageAttachBtn', text: 'Attach images for visual tasks (Pro plan)', position: 'top' },
+    { target: '#templatesBtn', text: 'Quick actions — common automations with one click', position: 'top' },
+    { target: '#sendBtn', text: 'Hit send or press Enter to start the automation. Audio responses will play through the speaker button when available.', position: 'top' },
+  ];
+
+  let currentStep = 0;
+
+  // Track highlighted elements so we can reset them
+  let highlightedEls = [];
+
+  function cleanupTour() {
+    document.querySelectorAll('.tour-overlay, .tour-tooltip').forEach(el => el.remove());
+    highlightedEls.forEach(el => { el.style.zIndex = ''; });
+    highlightedEls = [];
+  }
+
+  function showStep(idx) {
+    cleanupTour();
+
+    if (idx >= steps.length) {
+      localStorage.setItem(tourKey, 'true');
+      return;
+    }
+
+    const step = steps[idx];
+    const target = document.querySelector(step.target);
+    const rect = target ? target.getBoundingClientRect() : null;
+
+    // Skip if target missing or hidden (zero dimensions)
+    if (!target || (rect.width === 0 && rect.height === 0)) {
+      showStep(idx + 1);
+      return;
+    }
+
+    // Dark overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'tour-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;';
+    overlay.addEventListener('click', () => { showStep(idx + 1); });
+
+    // Tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tour-tooltip';
+    tooltip.style.cssText = `
+      position:fixed;z-index:10000;background:white;color:#1a1a1a;padding:16px 20px;
+      border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.2);max-width:260px;
+      font-family:var(--font-body);font-size:14px;line-height:1.5;
+    `;
+
+    // Position tooltip above the target, clamped within viewport
+    const tooltipLeft = Math.min(Math.max(10, rect.left), window.innerWidth - 270);
+    tooltip.style.left = tooltipLeft + 'px';
+    tooltip.style.bottom = (window.innerHeight - rect.top + 12) + 'px';
+
+    const isLast = idx === steps.length - 1;
+    tooltip.innerHTML = `
+      <div style="margin-bottom:10px">${step.text}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#718096;font-size:12px">${idx + 1}/${steps.length}</span>
+        <button style="background:#016B61;color:white;border:none;padding:6px 16px;border-radius:8px;cursor:pointer;font-weight:600">
+          ${isLast ? 'Done' : 'Next'}
+        </button>
+      </div>
+    `;
+
+    tooltip.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isLast) {
+        cleanupTour();
+        localStorage.setItem(tourKey, 'true');
+      } else {
+        showStep(idx + 1);
+      }
+    });
+
+    // Highlight target
+    target.style.position = 'relative';
+    target.style.zIndex = '10000';
+    highlightedEls.push(target);
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(tooltip);
+  }
+
+  // Delay tour start so user sees the interface first
+  setTimeout(() => showStep(0), 1500);
+}
+
+// ========================================
+// INITIALIZATION — Add new modules
+// ========================================
+
 // Initialize on page load
 initTTS();
 initSidebar();
+initImageAttach();
+initTemplates();
+initPlanBadge();
+initOnboardingTour();

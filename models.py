@@ -44,6 +44,9 @@ class AutomationHistory(BaseModel):
     urls_visited: List[str] = []
     errors: List[str] = []
     final_result: Optional[str] = None
+    image_thumbnail: Optional[str] = None  # Base64 thumbnail from vision module
+    is_rerun: bool = False  # Whether this was a re-run of a previous task
+    original_task_id: Optional[str] = None  # Link to original task if re-run
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     model_config = ConfigDict(use_enum_values=True)
@@ -230,6 +233,37 @@ class AutomationHistoryDB:
             )
         else:
             return UserStats(user_email=user_email)
+
+    @staticmethod
+    async def get_for_export(user_email: str, from_date: Optional[datetime] = None,
+                             to_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
+        """Get automation history for export (CSV/JSON), filtered by date range."""
+        db = get_database()
+        collection = db["automation_history"]
+
+        query = {"user_email": user_email}
+        if from_date or to_date:
+            date_filter = {}
+            if from_date:
+                date_filter["$gte"] = from_date
+            if to_date:
+                date_filter["$lte"] = to_date
+            query["start_time"] = date_filter
+
+        cursor = collection.find(
+            query,
+            {
+                "user_email": 0,
+                "image_thumbnail": 0,  # Exclude large thumbnail data from export
+            }
+        ).sort("start_time", -1)
+
+        results = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            results.append(doc)
+
+        return results
 
 
 class ScheduledTaskDB:

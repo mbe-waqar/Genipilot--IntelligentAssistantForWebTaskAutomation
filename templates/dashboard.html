@@ -18,12 +18,18 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
     <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 
+    <!-- Dashboard component styles (theme toggle, usage card, buttons, etc.) -->
+    <link rel="stylesheet" href="/css/style.css">
+
     <style>
         :root {
             --sidebar-width: 250px;
             --header-height: 60px;
         }
 
+        html, body {
+            overflow-x: hidden;
+        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #F0F7F6;
@@ -245,7 +251,7 @@
             margin-left: var(--sidebar-width);
             padding: 32px;
             min-height: 100vh;
-            overflow-x: auto; /* Horizontal scroll when extension panel narrows viewport */
+            overflow-x: hidden;
         }
 
         /* Header */
@@ -293,7 +299,7 @@
             background: linear-gradient(135deg, #0a2a25 0%, #016B61 55%, #00A699 100%) !important;
             border: none !important;
             position: relative;
-            overflow: hidden;
+            overflow: visible;
             box-shadow: 0 4px 20px rgba(1,107,97,0.2);
         }
 
@@ -306,6 +312,8 @@
             height: 160px;
             background: rgba(255,255,255,0.04);
             border-radius: 50%;
+            pointer-events: none;
+            overflow: hidden;
         }
 
         .section-header-accent::after {
@@ -317,6 +325,8 @@
             height: 100px;
             background: rgba(255,255,255,0.03);
             border-radius: 50%;
+            pointer-events: none;
+            overflow: hidden;
         }
 
         .section-header-accent h2 {
@@ -1169,6 +1179,7 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
     </style>
 </head>
 <body>
@@ -1244,10 +1255,12 @@
                         <h2><i class="bi bi-rocket-takeoff-fill" style="margin-right: 10px; font-size: 1.4rem;"></i>Dashboard Overview</h2>
                         <p class="text-muted mb-0">Welcome back! Here's your automation summary.</p>
                     </div>
-                    <div class="d-none d-md-block" style="position: relative; z-index: 1;">
-                        <div style="background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 10px 18px; text-align: center;">
-                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.6); margin-bottom: 2px;">Today</div>
-                            <div id="overviewDate" style="font-size: 0.95rem; font-weight: 600; color: #fff;"></div>
+                    <div class="d-flex align-items-center gap-3" style="position: relative; z-index: 1;">
+                        <div class="d-none d-md-block">
+                            <div style="background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 10px 18px; text-align: center;">
+                                <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.6); margin-bottom: 2px;">Today</div>
+                                <div id="overviewDate" style="font-size: 0.95rem; font-weight: 600; color: #fff;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1295,7 +1308,7 @@
                     </a>
                 </div>
                 <div class="col-lg-3 col-md-6 mb-4">
-                    <a class="stat-card-link" href="#settings" onclick="switchSection('settings')">
+                    <a class="stat-card-link" href="/pricing">
                         <div class="stat-card purple">
                             <div class="icon">
                                 <i class="bi bi-star-fill"></i>
@@ -1309,8 +1322,55 @@
                 </div>
             </div>
 
-            <!-- Charts Section — min-width wrapper prevents layout collapse when extension panel is open -->
-            <div style="min-width: 600px;">
+            <!-- Usage Card -->
+            <div class="row mb-4" id="usageCardRow">
+                <div class="col-lg-8 mb-3">
+                    <div class="usage-card" id="usageCard">
+                        <div class="usage-card-header">
+                            <div class="usage-card-title">
+                                <div class="usage-icon-wrap"><i class="bi bi-lightning-charge-fill"></i></div>
+                                <div>
+                                    <h5 class="mb-0">Daily Usage</h5>
+                                    <small class="usage-subtitle">Your automation activity today</small>
+                                </div>
+                            </div>
+                            <span class="badge usage-plan-badge" id="usagePlanBadge">Free Plan</span>
+                        </div>
+                        <div class="usage-meters">
+                            <div class="usage-meter">
+                                <div class="usage-meter-icon"><i class="bi bi-cpu"></i></div>
+                                <div class="usage-meter-body">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="usage-label">Tasks Today</span>
+                                        <span class="usage-value" id="usageTasksToday">0 / 100</span>
+                                    </div>
+                                    <div class="usage-progress-bar">
+                                        <div class="usage-progress-fill" id="usageTasksProgress" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="usage-meter">
+                                <div class="usage-meter-icon scheduled"><i class="bi bi-calendar2-check"></i></div>
+                                <div class="usage-meter-body">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="usage-label">Scheduled Tasks</span>
+                                        <span class="usage-value" id="usageScheduledTasks">0 / 25</span>
+                                    </div>
+                                    <div class="usage-progress-bar">
+                                        <div class="usage-progress-fill" id="usageScheduledProgress" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="/pricing" class="usage-upgrade-link">
+                            <i class="bi bi-arrow-up-circle"></i> Upgrade for more
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div style="width: 100%; overflow: hidden;">
             <div class="row align-items-stretch">
                 <div class="col-lg-8 mb-4 d-flex">
                     <div class="chart-container w-100 d-flex flex-column">
@@ -1492,7 +1552,19 @@
             <div class="table-container">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5>All Tasks</h5>
-                    <input type="text" class="form-control form-control-sm" style="max-width: 300px;" placeholder="Search tasks..." id="searchInput" onkeyup="searchTable()">
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="text" class="form-control form-control-sm" style="max-width: 300px;" placeholder="Search tasks..." id="searchInput" onkeyup="searchTable()">
+                        <!-- Export Dropdown -->
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle export-btn" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
+                                <li><a class="dropdown-item" href="#" onclick="exportHistory('csv')"><i class="bi bi-filetype-csv me-2"></i>Export CSV</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportHistory('json')"><i class="bi bi-filetype-json me-2"></i>Export JSON</a></li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table class="table custom-table">
@@ -1508,42 +1580,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>#001</td>
-                                <td>Web Scraping - Product Prices</td>
-                                <td>Scraping</td>
-                                <td>2025-11-14 15:30</td>
-                                <td><span class="status-badge status-success">Success</span></td>
-                                <td>2m 34s</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Details</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Retry</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>#002</td>
-                                <td>Form Filling - Customer Registration</td>
-                                <td>Form Filling</td>
-                                <td>2025-11-13 10:15</td>
-                                <td><span class="status-badge status-success">Success</span></td>
-                                <td>1m 12s</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Details</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Retry</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>#003</td>
-                                <td>Click Automation - Newsletter Signup</td>
-                                <td>Click Automation</td>
-                                <td>2025-11-12 14:22</td>
-                                <td><span class="status-badge status-failed">Failed</span></td>
-                                <td>0m 45s</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Details</button>
-                                    <button class="btn btn-sm btn-outline-secondary">Retry</button>
-                                </td>
-                            </tr>
+                            <!-- Rows populated dynamically by dashboard.js -->
                         </tbody>
                     </table>
                 </div>
@@ -1739,8 +1776,35 @@
                 </form>
             </div>
         </div>
+
     </div>
 
+    <!-- Re-run Confirmation Modal -->
+    <div class="modal fade" id="rerunConfirmModal" tabindex="-1" aria-labelledby="rerunConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rerunConfirmModalLabel">Re-run Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to re-run this task?</p>
+                    <p class="text-muted small" id="rerunTaskName"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-rerun" id="rerunConfirmBtn" onclick="confirmRerun()">
+                        <i class="bi bi-arrow-clockwise"></i> Re-run
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container for Notifications -->
+    <div id="dashboardNotifToastContainer" class="toast-notif-container"></div>
+
+    <!-- Onboarding Tour Overlay -->
     <!-- Task Details Modal -->
     <div class="modal fade" id="taskDetailsModal" tabindex="-1" aria-labelledby="taskDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -1886,7 +1950,7 @@
         // Restore active section from URL hash on page load
         (function restoreSectionFromHash() {
             const hash = window.location.hash.replace('#', '');
-            const validSections = ['overview', 'profile', 'history', 'scheduled', 'voice', 'settings'];
+            const validSections = ['overview', 'profile', 'history', 'scheduled', 'voice', 'settings', 'pricing'];
             if (hash && validSections.includes(hash)) {
                 switchSection(hash, false);
             }
@@ -1952,8 +2016,8 @@
             if (clockElement) {
                 const now = new Date();
                 const timeString = now.toLocaleTimeString('en-US', {
-                    hour12: false,
-                    hour: '2-digit',
+                    hour12: true,
+                    hour: 'numeric',
                     minute: '2-digit',
                     second: '2-digit'
                 });
@@ -2017,9 +2081,9 @@
         window.pieChart = new Chart(pieCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Scraping', 'Form Filling', 'Click Automation'],
+                labels: ['Success', 'Failed', 'Pending'],
                 datasets: [{
-                    data: [50, 30, 20],
+                    data: [0, 0, 0],
                     backgroundColor: [
                         '#016B61',
                         '#70B2B2',
