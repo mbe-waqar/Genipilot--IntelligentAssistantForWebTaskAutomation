@@ -2294,6 +2294,289 @@ async def api_export_history(request: Request, email: str = None,
 
 
 # ============================================================================
+# PDF Report Export
+# ============================================================================
+
+@app.get("/api/export-pdf-report")
+async def export_pdf_report(request: Request):
+    """Generate and download a PDF report of the user's automation activity."""
+    from models import AutomationHistoryDB, ScheduledTaskDB
+    from fpdf import FPDF
+    from io import BytesIO
+    from starlette.responses import Response
+
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    user_email = user["email"]
+
+    # Fetch user profile
+    user_doc = db[USERS_COLLECTION].find_one({"email": user_email}) if db is not None else None
+    username = user_doc.get("username", "User") if user_doc else "User"
+
+    # Fetch stats
+    stats = await AutomationHistoryDB.get_user_stats(user_email)
+
+    # Fetch recent history (last 20)
+    history = await AutomationHistoryDB.get_by_user(user_email, limit=20)
+
+    # Fetch scheduled tasks
+    scheduled_tasks = await ScheduledTaskDB.get_by_user(user_email)
+
+    # Fetch plan info
+    try:
+        from plan_module import get_user_plan_info
+        plan_info = await get_user_plan_info(user_email)
+        plan_name = plan_info.get("plan", "Free").capitalize()
+    except Exception:
+        plan_name = "Free"
+
+    # --- Build PDF ---
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+
+    # Colors
+    primary = (1, 107, 97)      # #016B61
+    dark = (10, 42, 37)         # #0a2a25
+    text_color = (51, 51, 51)
+    light_bg = (240, 247, 246)  # #F0F7F6
+    white = (255, 255, 255)
+
+    # --- Header ---
+    pdf.set_fill_color(*primary)
+    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_text_color(*white)
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_y(10)
+    pdf.cell(0, 10, "GeniPilot - Automation Report", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 8, f"Generated: {datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}", ln=True, align="C")
+
+    pdf.ln(10)
+
+    # --- User Info ---
+    pdf.set_text_color(*text_color)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 7, f"User: {username}  |  Email: {user_email}  |  Plan: {plan_name}", ln=True)
+    pdf.ln(5)
+
+    # --- Summary Statistics ---
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(*dark)
+    pdf.cell(0, 10, "Summary Statistics", ln=True)
+    pdf.set_draw_color(*primary)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(*text_color)
+
+    avg_duration = (stats.total_duration_seconds / stats.total_tasks) if stats.total_tasks > 0 else 0
+    date_range_start = "N/A"
+    date_range_end = "N/A"
+    if history:
+        dates = [h.get("start_time") for h in history if h.get("start_time")]
+        if dates:
+            min_date = min(dates)
+            max_date = max(dates)
+            date_range_start = min_date.strftime("%b %d, %Y") if hasattr(min_date, 'strftime') else str(min_date)[:10]
+            date_range_end = max_date.strftime("%b %d, %Y") if hasattr(max_date, 'strftime') else str(max_date)[:10]
+
+    stat_items = [
+        ("Total Automations", str(stats.total_tasks)),
+        ("Success Rate", f"{stats.success_rate}%"),
+        ("Successful Tasks", str(stats.successful_tasks)),
+        ("Failed Tasks", str(stats.failed_tasks)),
+        ("Average Duration", f"{avg_duration:.1f}s"),
+        ("Report Period", f"{date_range_start} - {date_range_end}"),
+    ]
+
+    col_width = 95
+    for i, (label, value) in enumerate(stat_items):
+        x = 10 + (i % 2) * col_width
+        if i % 2 == 0 and i > 0:
+            pdf.ln(7)
+        pdf.set_x(x)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(50, 7, f"{label}:", align="L")
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(40, 7, value, align="L")
+
+    pdf.ln(12)
+
+    # --- Task Status Breakdown ---
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(*dark)
+    pdf.cell(0, 10, "Task Status Breakdown", ln=True)
+    pdf.set_draw_color(*primary)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+
+    # Table header
+    pdf.set_fill_color(*primary)
+    pdf.set_text_color(*white)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(63, 8, "Status", 1, 0, "C", fill=True)
+    pdf.cell(63, 8, "Count", 1, 0, "C", fill=True)
+    pdf.cell(64, 8, "Percentage", 1, 1, "C", fill=True)
+
+    pdf.set_text_color(*text_color)
+    pdf.set_font("Helvetica", "", 10)
+    total = stats.total_tasks if stats.total_tasks > 0 else 1
+
+    canceled = stats.total_tasks - stats.successful_tasks - stats.failed_tasks - stats.pending_tasks
+    if canceled < 0:
+        canceled = 0
+
+    breakdown = [
+        ("Completed", stats.successful_tasks),
+        ("Failed", stats.failed_tasks),
+        ("Cancelled", canceled),
+        ("Pending", stats.pending_tasks),
+    ]
+
+    for i, (status, count) in enumerate(breakdown):
+        if i % 2 == 0:
+            pdf.set_fill_color(*light_bg)
+        else:
+            pdf.set_fill_color(*white)
+        pct = f"{(count / total * 100):.1f}%" if stats.total_tasks > 0 else "0%"
+        pdf.cell(63, 7, status, 1, 0, "C", fill=True)
+        pdf.cell(63, 7, str(count), 1, 0, "C", fill=True)
+        pdf.cell(64, 7, pct, 1, 1, "C", fill=True)
+
+    pdf.ln(8)
+
+    # --- Recent Automation History ---
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(*dark)
+    pdf.cell(0, 10, "Recent Automation History (Last 20)", ln=True)
+    pdf.set_draw_color(*primary)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+
+    if not history:
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(0, 8, "No automation history yet.", ln=True)
+    else:
+        # Table header
+        pdf.set_fill_color(*primary)
+        pdf.set_text_color(*white)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(55, 7, "Task Name", 1, 0, "C", fill=True)
+        pdf.cell(22, 7, "Status", 1, 0, "C", fill=True)
+        pdf.cell(32, 7, "Date", 1, 0, "C", fill=True)
+        pdf.cell(18, 7, "Duration", 1, 0, "C", fill=True)
+        pdf.cell(63, 7, "Result", 1, 1, "C", fill=True)
+
+        pdf.set_text_color(*text_color)
+        pdf.set_font("Helvetica", "", 7.5)
+
+        for i, h in enumerate(history):
+            if pdf.get_y() > 265:
+                pdf.add_page()
+
+            if i % 2 == 0:
+                pdf.set_fill_color(*light_bg)
+            else:
+                pdf.set_fill_color(*white)
+
+            task_name = str(h.get("task_name", ""))[:30]
+            status = str(h.get("status", ""))
+            start = h.get("start_time")
+            if hasattr(start, 'strftime'):
+                date_str = start.strftime("%Y-%m-%d %H:%M")
+            else:
+                date_str = str(start)[:16] if start else ""
+            duration = h.get("duration_seconds")
+            dur_str = f"{duration:.0f}s" if duration else "-"
+            result = str(h.get("final_result") or "")[:55]
+
+            pdf.cell(55, 6, task_name, 1, 0, "L", fill=True)
+            pdf.cell(22, 6, status, 1, 0, "C", fill=True)
+            pdf.cell(32, 6, date_str, 1, 0, "C", fill=True)
+            pdf.cell(18, 6, dur_str, 1, 0, "C", fill=True)
+            pdf.cell(63, 6, result, 1, 1, "L", fill=True)
+
+    pdf.ln(8)
+
+    # --- Scheduled Tasks ---
+    if pdf.get_y() > 240:
+        pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(*dark)
+    pdf.cell(0, 10, "Scheduled Tasks", ln=True)
+    pdf.set_draw_color(*primary)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+
+    active_tasks = [t for t in scheduled_tasks if t.get("is_active", False)]
+    if not active_tasks:
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(0, 8, "No active scheduled tasks.", ln=True)
+    else:
+        pdf.set_fill_color(*primary)
+        pdf.set_text_color(*white)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(55, 7, "Task Name", 1, 0, "C", fill=True)
+        pdf.cell(30, 7, "Frequency", 1, 0, "C", fill=True)
+        pdf.cell(50, 7, "Next Run", 1, 0, "C", fill=True)
+        pdf.cell(55, 7, "Last Status", 1, 1, "C", fill=True)
+
+        pdf.set_text_color(*text_color)
+        pdf.set_font("Helvetica", "", 8.5)
+
+        for i, t in enumerate(active_tasks):
+            if pdf.get_y() > 265:
+                pdf.add_page()
+
+            if i % 2 == 0:
+                pdf.set_fill_color(*light_bg)
+            else:
+                pdf.set_fill_color(*white)
+
+            name = str(t.get("task_name", ""))[:30]
+            freq = str(t.get("frequency", ""))
+            next_run = t.get("next_run")
+            if hasattr(next_run, 'strftime'):
+                next_str = next_run.strftime("%Y-%m-%d %H:%M")
+            else:
+                next_str = str(next_run)[:16] if next_run else "Pending"
+            last_status = str(t.get("last_execution_status", "pending"))
+
+            pdf.cell(55, 6, name, 1, 0, "L", fill=True)
+            pdf.cell(30, 6, freq, 1, 0, "C", fill=True)
+            pdf.cell(50, 6, next_str, 1, 0, "C", fill=True)
+            pdf.cell(55, 6, last_status, 1, 1, "C", fill=True)
+
+    # --- Footer on every page ---
+    total_pages = pdf.page
+    for page_num in range(1, total_pages + 1):
+        pdf.page = page_num
+        pdf.set_y(-15)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(130, 130, 130)
+        pdf.cell(0, 10, f"Generated by GeniPilot - AI-Powered Browser Automation  |  Page {page_num}/{total_pages}", align="C")
+
+    # Output PDF
+    pdf_bytes = pdf.output()
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    return Response(
+        content=bytes(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="genipilot-report-{today_str}.pdf"'
+        }
+    )
+
+
+# ============================================================================
 # Task Re-run Endpoint
 # ============================================================================
 

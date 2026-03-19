@@ -56,3 +56,6 @@ pymongo[srv]
 
 # Optional: For local content extraction
 readability-lxml
+
+# PDF Report Generation
+fpdf2

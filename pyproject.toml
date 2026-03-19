@@ -27,4 +27,5 @@ dependencies = [
     "readability-lxml>=0.8.4.1",
     "uvicorn>=0.38.0",
     "websockets>=13.0.0",
+    "fpdf2>=2.8.1",
 ]

@@ -5,7 +5,9 @@
       "Bash(python:*)",
       "Bash(cd:*)",
       "Bash(node --check templates/assets/js/dashboard.js)",
-      "Bash(node --check extension/sidebar.js)"
+      "Bash(node --check extension/sidebar.js)",
+      "Bash(ls:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

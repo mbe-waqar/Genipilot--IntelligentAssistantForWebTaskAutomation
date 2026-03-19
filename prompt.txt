@@ -1,277 +1,318 @@
 ================================================================================
-CHROME EXTENSION — "SUMMARIZE THIS PAGE" SENDS WRONG TAB / BLANK TAB BUG
+TASK 1: PDF REPORT EXPORT FOR DASHBOARD
 ================================================================================
 
 CONTEXT:
-GeniPilot is a Chrome extension (Manifest V3 side panel) that lets users type
-automation commands like "summarize this page". The extension sidebar
-(sidebar.js) communicates with the agent server (agent_server.py) via WebSocket.
-The agent server runs browser automation using browser-use connecting to Chrome
-via CDP (Chrome DevTools Protocol) at localhost:9222.
+FYPAuto (GeniPilot) is an AI-powered browser automation platform built with
+FastAPI (main.py on port 8000), an Agent Server (agent_server.py on port 5005),
+MongoDB (async motor), and a Chrome Extension (Manifest V3 side panel).
 
-CRITICAL RULE: Do NOT break or alter any existing functionality — message
-sending, WebSocket streaming, image attach, TTS, templates, stop/cancel,
-plan limits, scheduled tasks, re-run, HITL input modals, onboarding tour,
-or any other feature must all continue to work exactly as they do now.
+The dashboard (templates/dashboard.html) already has:
+- Automation history table with search, filter, status badges, rerun, delete
+- Scheduled tasks section with CRUD operations
+- Stats cards: total tasks, success rate, scheduled count, next run
+- Usage monitoring: daily task usage vs limit, scheduled tasks vs limit
+- Charts: line chart (task timeline via Chart.js), pie chart (status breakdown)
+- Profile section, notification settings, plan & billing section
 
-================================================================================
-BUG DESCRIPTION
-================================================================================
+The backend (main.py) already has these relevant endpoints:
+- GET /api/automation-history — returns user's automation history from MongoDB
+- GET /api/scheduled-tasks — returns user's scheduled tasks
+- GET /api/user-stats — returns aggregated stats (total, success rate, etc.)
+- GET /api/export-history — exports history as CSV/JSON (excludes thumbnails)
 
-When the user has multiple Chrome tabs open (e.g., Tab 1: YouTube, Tab 2:
-Gmail, Tab 3: SalmanFoods, Tab 4: Wikipedia) and is CURRENTLY VIEWING the
-SalmanFoods tab, then types "summarize this page" in the extension sidebar:
-
-  BUG 1: Agent opens a NEW BLANK tab (about:blank) and returns empty content
-  BUG 2: Agent summarizes the WRONG tab (e.g., YouTube instead of SalmanFoods)
-  EXPECTED: Agent should summarize the SalmanFoods tab — the one the user
-            is currently looking at
-
-This affects ALL "current page" commands — not just summarize:
-  - "summarize this page"
-  - "extract all links from this page"
-  - "what is this page about"
-  - "fill out the form on this page"
-  - Any task referencing "this page", "current page", "this tab", "this site"
+CRITICAL RULE: Do NOT break or alter any existing functionality — the dashboard
+UI, WebSocket connections, authentication, automation execution, HITL modals,
+scheduled tasks, plan limits, history table, charts, profile management,
+notification settings, extension chat, voice assistant, image module, or any
+other feature must all continue to work exactly as they do now.
 
 ================================================================================
-ROOT CAUSE ANALYSIS
+FEATURE DESCRIPTION
 ================================================================================
 
-There are TWO separate failures causing this bug:
-
-─── FAILURE 1: Extension never sends current tab URL ───────────────────────────
-
-File: extension/sidebar.js
-Function: sendMessage() (inside initChat())
-Lines: ~1118-1128
-
-The WebSocket payload sent to the server is:
-    const payload = { message: message };
-    if (imageData) { payload.image = imageData; }
-    websocket.send(JSON.stringify(payload));
-
-The payload ONLY contains { message: "summarize this page" }. It does NOT
-include the URL or title of the tab the user is currently viewing.
-
-The extension has access to Chrome APIs (chrome.tabs.query) that can retrieve
-the active tab's URL and title, but this data is NEVER fetched or sent.
-
-─── FAILURE 2: Tab selection falls through to "create new tab" ─────────────────
-
-File: agent_server.py
-Function: select_automation_tab() → _find_relevant_tab()
-Lines: ~766-864
-
-The tab selection logic works by extracting DOMAIN KEYWORDS from the task text:
-    task = "summarize this page"
-    → No explicit URL found (no https?:// match)
-    → No keyword match in _DOMAIN_KEYWORDS (no "youtube", "gmail", etc.)
-    → target_domains = empty set
-    → _find_relevant_tab() returns None (line 788)
-
-Since no relevant tab is found, select_automation_tab() hits Rule 3:
-    "No relevant tab found — creating a new tab."
-    → Creates about:blank tab
-    → Agent attaches to blank tab → gets nothing to summarize
-
-Even if the tab selection somehow picks a tab, it picks based on domain
-keywords in the task text, NOT based on which tab the user is actually viewing.
+Add a "Download PDF Report" button to the dashboard that generates a
+professional PDF report of the user's automation activity. This report should
+be useful for project evaluators/professors to see a summary of the system's
+capabilities and the user's usage.
 
 ================================================================================
-THE FIX — TWO PARTS
+PDF REPORT CONTENT
 ================================================================================
 
-─── PART 1: Extension sends current tab URL + title with every message ─────────
+The PDF report should include the following sections:
 
-File to modify: extension/sidebar.js
-Function to modify: sendMessage() inside initChat()
+1. HEADER
+   - Report title: "GeniPilot — Automation Report"
+   - Generated date and time
+   - User name and email
 
-BEFORE building the WebSocket payload, query the active Chrome tab:
+2. SUMMARY STATISTICS
+   - Total automations run
+   - Success rate (percentage)
+   - Total scheduled tasks
+   - Average task duration
+   - Current plan name
+   - Date range of the report
 
-    // Get the active tab URL and title
-    let currentTabUrl = '';
-    let currentTabTitle = '';
-    try {
-        const [tab] = await chrome.tabs.query({
-            active: true,
-            currentWindow: true        // ← IMPORTANT: same window the user is in
-        });
-        if (tab && tab.url) {
-            currentTabUrl = tab.url;
-            currentTabTitle = tab.title || '';
-        }
-    } catch (e) {
-        console.log('Could not get active tab:', e);
-    }
+3. TASK STATUS BREAKDOWN (Table)
+   - Number of completed tasks
+   - Number of failed tasks
+   - Number of cancelled tasks
 
-Then include it in the payload:
+4. RECENT AUTOMATION HISTORY (Table — last 20 tasks)
+   - Task name
+   - Status (completed/failed/cancelled)
+   - Date & time
+   - Duration
+   - Brief result summary (truncated to 100 chars)
 
-    const payload = {
-        message: message,
-        current_tab_url: currentTabUrl,
-        current_tab_title: currentTabTitle
-    };
-    if (imageData) { payload.image = imageData; }
+5. SCHEDULED TASKS (Table — all active)
+   - Task name
+   - Frequency (once/hourly/daily/weekly/monthly)
+   - Next scheduled run
+   - Last run status
 
-IMPORTANT: The sendMessage function must become `async function sendMessage()`
-(it already is async in the current code, so this is fine).
+6. FOOTER
+   - "Generated by GeniPilot — AI-Powered Browser Automation"
+   - Page numbers
 
-IMPORTANT: The extension manifest.json must include the "activeTab" permission
-in the "permissions" array. Check if it's there; if not, add it:
+================================================================================
+IMPLEMENTATION PLAN
+================================================================================
 
-    "permissions": ["sidePanel", "storage", "identity", "activeTab"]
+APPROACH: Use a lightweight Python PDF library. Choose ONE of:
+  - reportlab (most popular, no extra system deps)
+  - fpdf2 (simple, lightweight)
+  - weasyprint (HTML to PDF, but requires system deps — AVOID)
 
-ALSO: host_permissions already includes "http://localhost:8000/*" and
-"http://localhost:5005/*", but for querying ANY tab URL, the extension needs
-broad host permissions or the "tabs" permission. Add "tabs" to permissions:
+Recommended: Use "reportlab" or "fpdf2" — add it to requirements.txt and
+pyproject.toml dependencies.
 
-    "permissions": ["sidePanel", "storage", "identity", "activeTab", "tabs"]
+--- BACKEND (main.py) ---
 
-─── PART 2: Server uses current_tab_url for tab selection ──────────────────────
+1. Add new endpoint: GET /api/export-pdf-report
+   - Requires authentication (same session check as other dashboard endpoints)
+   - Fetches user stats, automation history (last 20), and scheduled tasks
+   - Generates PDF in memory using BytesIO
+   - Returns PDF as StreamingResponse with:
+     - Content-Type: application/pdf
+     - Content-Disposition: attachment; filename="genipilot-report-{date}.pdf"
 
-File to modify: agent_server.py
+2. PDF generation function: generate_pdf_report(user_data, stats, history, scheduled_tasks)
+   - Takes the fetched data and builds the PDF
+   - Use clean formatting: tables with alternating row colors, headers, etc.
+   - Keep it professional and clean — no emojis in the PDF
+   - Handle edge cases: no history yet, no scheduled tasks, etc.
 
-2A. Extract current_tab_url from the WebSocket message
-    In the WebSocket handler (websocket_chat function), after parsing
-    message_data, extract:
+--- FRONTEND (templates/dashboard.html) ---
 
-        current_tab_url = message_data.get("current_tab_url", "")
-        current_tab_title = message_data.get("current_tab_title", "")
-
-    Pass current_tab_url to execute_automation_task() and then to
-    select_automation_tab().
-
-2B. Modify select_automation_tab() signature and logic
-    Change: async def select_automation_tab(task: str) -> str:
-    To:     async def select_automation_tab(task: str, current_tab_url: str = "") -> str:
-
-    Add a NEW Rule 0 — HIGHEST PRIORITY — before Rule 1 (new tab phrases):
-
-        # Rule 0 — If current_tab_url is provided AND the task references
-        # "this page"/"current page"/"this tab"/"this site", find and activate
-        # the tab matching that URL.
-        _CURRENT_PAGE_PHRASES = [
-            "this page", "current page", "this tab", "this site",
-            "this website", "the page", "the current",
-        ]
-
-        if current_tab_url and any(p in task.lower() for p in _CURRENT_PAGE_PHRASES):
-            valid_tabs = await _get_valid_browser_tabs()
-            for tab in valid_tabs:
-                if tab.get("url", "") == current_tab_url:
-                    print(f"📋 [TabSelect] Matched current tab by URL: {tab.get('url', '')[:70]}")
-                    await _activate_existing_tab(tab["id"])
-                    return tab["id"]
-            # Fallback: URL not found in CDP targets (unlikely) — continue
-            # to other rules
-
-    This ensures that when the user says "summarize this page" and the
-    extension sends current_tab_url="https://salmanfoods.com/...", the server
-    finds exactly that tab and activates it.
-
-2C. Modify execute_automation_task() to accept and forward current_tab_url
-    Change the function signature to include current_tab_url parameter.
-    Pass it through to select_automation_tab().
-
-2D. Modify the Automation tool function to accept and forward current_tab_url
-    The @function_tool Automation() callable needs to receive current_tab_url
-    from the calling context. Since tool functions are called by the OpenAI
-    Agent SDK, you cannot easily add parameters. Instead, store current_tab_url
-    in a global/context variable (similar to _current_automation_user):
-
-        _current_tab_url = ""
-
-    Set it before calling Runner.run_streamed() in the WebSocket handler.
-    Read it inside execute_automation_task().
-
-2E. Enrich the task prompt with the actual URL
-    In execute_automation_task(), after the select_automation_tab() call,
-    if current_tab_url is provided and the task mentions "this page", prepend
-    context to the processed_task:
-
-        if current_tab_url and any(p in processed_task.lower() for p in _CURRENT_PAGE_PHRASES):
-            processed_task = (
-                f"[CONTEXT: The user is currently viewing: {current_tab_url} "
-                f"(title: {current_tab_title}). "
-                f"Perform the following task on THIS specific page.]\n\n"
-                f"{processed_task}"
-            )
-
-    This gives the browser-use agent explicit URL context so it navigates to
-    the correct page even if tab selection had issues.
+3. Add a "Download Report" button in the dashboard
+   - Place it near the existing export buttons (CSV/JSON) in the history section
+     OR in the stats/overview section at the top
+   - Style it consistently with existing buttons (use existing CSS classes)
+   - On click: window.location.href = '/api/export-pdf-report'
+     (this triggers the download directly)
+   - Add a small loading indicator while PDF generates (optional)
 
 ================================================================================
 FILES TO MODIFY
 ================================================================================
 
-1. extension/manifest.json
-   - Add "activeTab" and "tabs" to permissions array
+1. requirements.txt — add reportlab or fpdf2
+2. pyproject.toml — add reportlab or fpdf2 to dependencies
+3. main.py — add GET /api/export-pdf-report endpoint + PDF generation function
+4. templates/dashboard.html — add "Download Report" button in the UI
 
-2. extension/sidebar.js
-   - In sendMessage(): query chrome.tabs for active tab, include URL + title
-     in the WebSocket payload
-   - Do NOT change anything else in sendMessage (image attach, typing
-     indicator, WebSocket state checks must remain identical)
-
-3. agent_server.py
-   - Add global _current_tab_url and _current_tab_title variables
-   - In websocket_chat(): extract current_tab_url and current_tab_title
-     from message_data, store in globals before running agent
-   - Modify select_automation_tab() to accept current_tab_url param,
-     add Rule 0 for "this page" matching
-   - Modify execute_automation_task() to accept and forward current_tab_url,
-     enrich prompt with URL context
-   - Add _CURRENT_PAGE_PHRASES constant near _NEW_TAB_PHRASES
-
-================================================================================
-IMPLEMENTATION ORDER
-================================================================================
-
-1. extension/manifest.json — add permissions (safest, no logic change)
-2. extension/sidebar.js — add tab query to sendMessage payload
-3. agent_server.py — add global vars, modify WebSocket handler
-4. agent_server.py — modify select_automation_tab with Rule 0
-5. agent_server.py — modify execute_automation_task with prompt enrichment
+DO NOT modify:
+- agent_server.py
+- extension/* files
+- Any existing endpoints or their behavior
+- Any existing CSS/JS functionality
+- MongoDB schema or collections
+- WebSocket handlers
+- Authentication logic
 
 ================================================================================
 TESTING CHECKLIST
 ================================================================================
 
-[ ] Open 4 tabs: YouTube, Gmail, SalmanFoods, Wikipedia
-[ ] Switch to SalmanFoods tab, open extension sidebar
-[ ] Type "summarize this page" → should summarize SalmanFoods (NOT YouTube)
-[ ] Type "extract all links from this page" → should extract from SalmanFoods
-[ ] Type "what is this page about" → should describe SalmanFoods
-[ ] Switch to YouTube tab, type "summarize this page" → should summarize YouTube
-[ ] Type "open Google in a new tab" → should still open a new tab (not reuse)
-[ ] Type "go to facebook" → should still use domain matching (existing behavior)
-[ ] Type a normal chat message "hello" → should work normally (no tab issues)
-[ ] Image attach + send still works
-[ ] TTS still works after response
-[ ] Stop/cancel automation still works
-[ ] Templates still work
-[ ] HITL input modals still work
-[ ] Scheduled tasks still run correctly
-[ ] Re-run from dashboard still works
-[ ] Extension login/logout still works
-[ ] No console errors in extension or server
+[ ] Click "Download Report" → PDF downloads with correct filename
+[ ] PDF opens correctly in any PDF viewer
+[ ] PDF contains all 6 sections with correct data
+[ ] PDF handles empty history gracefully (shows "No automation history yet")
+[ ] PDF handles empty scheduled tasks gracefully
+[ ] Existing CSV/JSON export still works
+[ ] Dashboard loads normally after changes
+[ ] All other dashboard features still work (history, scheduled tasks, charts)
+[ ] Unauthenticated users cannot access the PDF endpoint (redirects to login)
+[ ] Button styling matches the existing dashboard design
 
 ================================================================================
-WHAT NOT TO CHANGE
+END OF TASK 1
 ================================================================================
 
-- WebSocket message format for: input_response, cancel, image_processing
-- Plan limit checking logic
-- Automation history recording
-- TTS functionality
-- Template definitions and behavior
-- Onboarding tour
-- Image attach/vision processing
-- Session/memory handling
-- MongoDB operations
-- Any CSS/HTML files
-- Login/logout flows
+
+================================================================================
+TASK 2: PROFESSIONAL README & DOCUMENTATION
+================================================================================
+
+CONTEXT:
+The current README.md is outdated — it only covers basic features (agent,
+browser automation, WebSocket, extension, auth). The project has grown
+significantly and now includes: scheduled tasks, voice assistant, image/vision
+module, HITL (human-in-the-loop), subscription plans, email notifications,
+profile management, PDF report export (from Task 1), and much more.
+
+CRITICAL RULE: Do NOT break or alter any existing functionality. This task
+ONLY modifies README.md — no code changes. Do NOT modify any .py, .js, .html,
+.css, or .json files.
+
+================================================================================
+NEW README STRUCTURE
+================================================================================
+
+Rewrite README.md with the following structure. Make it professional, clean,
+and suitable for a Final Year Project submission. Use proper markdown formatting.
+
+1. PROJECT TITLE & BADGES
+   - Title: GeniPilot — AI-Powered Browser Automation Platform
+   - One-line description
+   - Tech stack badges (Python, FastAPI, MongoDB, OpenAI, Chrome Extension)
+
+2. OVERVIEW
+   - 2-3 paragraph description of what the project does
+   - Who it's for and what problem it solves
+   - Key differentiators (HITL safety, real-time streaming, voice/vision)
+
+3. KEY FEATURES (grouped by category)
+   - AI & Automation: Orchestrator agent, browser automation, HITL safety
+   - Dashboard: Stats, charts, history management, scheduled tasks
+   - Browser Extension: Side panel chat, real-time streaming, templates
+   - Vision Module: Image upload/paste, GPT-4o analysis, context enrichment
+   - Voice Assistant: Speech recognition, audio feedback, voice commands
+   - Scheduling: Multiple frequencies, cron support, auto-execution
+   - Subscription Plans: Free/Pro/Enterprise tiers, usage limits, feature gating
+   - Email Notifications: Task completion alerts, error reports
+   - User Management: Email/password auth, Google OAuth, email verification
+   - Report Export: PDF, CSV, JSON export of automation history
+
+4. SYSTEM ARCHITECTURE
+   - Text-based architecture diagram showing:
+     - Chrome Extension ↔ Agent Server (WebSocket)
+     - Web Dashboard ↔ Main Server (HTTP + WebSocket)
+     - Agent Server → Orchestrator Agent → Browser Agent → Chrome (CDP)
+     - Both servers → MongoDB
+   - Brief explanation of the two-server architecture
+
+5. TECH STACK (clean table format)
+   - Backend: FastAPI, Python 3.11+, Motor (async MongoDB)
+   - AI/ML: OpenAI Agents SDK, GPT-4.1-mini, GPT-4o, browser-use, LangChain
+   - Database: MongoDB
+   - Frontend: HTML/CSS/JS, Bootstrap, Chart.js, Cropper.js
+   - Extension: Chrome Manifest V3, Side Panel API
+   - Scheduling: APScheduler
+   - Auth: Argon2, Google OAuth 2.0, Session-based
+   - Communication: WebSocket, SMTP
+
+6. PREREQUISITES
+   - Python 3.11+
+   - MongoDB (local or Atlas)
+   - Chrome browser
+   - OpenAI API key
+   - Google OAuth credentials (optional)
+   - SMTP email account (optional)
+
+7. INSTALLATION & SETUP
+   - Step 1: Clone repository
+   - Step 2: Install dependencies (uv sync OR pip install)
+   - Step 3: Configure .env file (list all variables with descriptions)
+   - Step 4: Start Chrome with CDP (commands for Windows/Mac/Linux)
+   - Step 5: Start Main Server (python main.py → port 8000)
+   - Step 6: Start Agent Server (python agent_server.py → port 5005)
+   - Step 7: Load Chrome Extension (step-by-step)
+
+8. USAGE GUIDE
+   - Web Dashboard: Login → Dashboard → Run automations, view history, manage tasks
+   - Chrome Extension: Login → Type command → Watch real-time execution
+   - Voice Commands: Click mic → Speak → Agent executes
+   - Image Automation: Upload/paste image → Add instruction → Execute
+   - Scheduled Tasks: Create → Set frequency → Auto-runs
+
+9. API REFERENCE (brief table format, not full JSON examples)
+   - Group by: Auth, Pages, Automation, Scheduled Tasks, User/Profile,
+     Plan, Extension, WebSocket
+   - Show: Method, Path, Brief Description
+   - Keep it concise — just a reference table, not full documentation
+
+10. PROJECT STRUCTURE (updated tree)
+    - Show all key files and folders with one-line descriptions
+    - Include: main.py, agent_server.py, models.py, plan_module.py,
+      vision_module.py, task_scheduler.py, mongodb_session.py,
+      templates/, extension/, requirements.txt, pyproject.toml
+
+11. TROUBLESHOOTING
+    - Common issues with solutions (keep existing ones, add new ones)
+
+12. LICENSE
+    - MIT License (or whatever the user prefers)
+
+================================================================================
+STYLE GUIDELINES
+================================================================================
+
+- Professional tone — this is for FYP evaluators
+- Use proper markdown: headers, tables, code blocks, bullet points
+- NO emojis anywhere in the README (keep it academic/professional)
+- Keep descriptions concise but informative
+- Use code blocks for commands and file paths
+- Use tables where appropriate (tech stack, API reference)
+- Total length: 300-500 lines (comprehensive but not bloated)
+
+================================================================================
+FILES TO MODIFY
+================================================================================
+
+1. README.md — complete rewrite
+
+DO NOT modify any other file. This is documentation only.
+
+================================================================================
+IMPLEMENTATION ORDER
+================================================================================
+
+Do Task 1 (PDF Report) first, then Task 2 (README) — because the README
+should mention the PDF report export feature.
+
+================================================================================
+TESTING CHECKLIST
+================================================================================
+
+[ ] README.md renders correctly on GitHub
+[ ] All code blocks have proper language tags
+[ ] All sections are present and complete
+[ ] No broken markdown formatting
+[ ] No emojis in the README
+[ ] Architecture diagram renders properly in monospace
+[ ] Tech stack table renders properly
+[ ] API reference table renders properly
+[ ] Project structure tree renders properly
+
+================================================================================
+OVERALL SAFETY RULES
+================================================================================
+
+1. Do NOT modify any existing Python endpoint behavior
+2. Do NOT modify any existing JavaScript functionality
+3. Do NOT modify any existing HTML structure (except adding the PDF button)
+4. Do NOT modify any existing CSS
+5. Do NOT modify MongoDB schemas or collections
+6. Do NOT modify WebSocket message formats
+7. Do NOT modify authentication/session logic
+8. Do NOT modify the Chrome extension (except if absolutely needed)
+9. Do NOT remove any existing features or UI elements
+10. Test that ALL existing features still work after changes
+11. If unsure about something, ask — don't guess
 
 ================================================================================
 END OF PROMPT
